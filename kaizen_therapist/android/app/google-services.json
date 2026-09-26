@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "627513396868",
+    "project_id": "kaizen-home-spa-bf55a",
+    "storage_bucket": "kaizen-home-spa-bf55a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627513396868:android:7a6587384f2c46e5cc7cd1",
+        "android_client_info": {
+          "package_name": "com.kaizen.homespa_client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-W1_bSwFXdjtCq0oLvaGNFojnwMTQ1zs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627513396868:android:ad4f3a26a5c5a2f2cc7cd1",
+        "android_client_info": {
+          "package_name": "com.kaizen.spa.kaizen_therapist"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-W1_bSwFXdjtCq0oLvaGNFojnwMTQ1zs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
