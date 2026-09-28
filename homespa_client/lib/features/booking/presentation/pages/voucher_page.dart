@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/flow_widgets.dart';
 import '../../../promo/presentation/providers/rewards_provider.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
@@ -56,13 +55,14 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
   }
 
   Future<void> _applyVoucher([String? overrideCode]) async {
-    final code =
-        (overrideCode ?? _codeController.text.trim()).toUpperCase();
+    final code = (overrideCode ?? _codeController.text.trim()).toUpperCase();
     if (code.isEmpty) return;
-    setState(() { _isValidating = true; _errorMessage = null; });
+    setState(() {
+      _isValidating = true;
+      _errorMessage = null;
+    });
     try {
-      final result =
-          await ref.read(validateVoucherUseCaseProvider).call(code);
+      final result = await ref.read(validateVoucherUseCaseProvider).call(code);
       result.fold(
         (failure) => setState(() => _errorMessage = failure.message),
         (voucher) {
@@ -80,21 +80,17 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
     final cart = ref.watch(bookingCartProvider);
     final clientVouchersAsync = ref.watch(clientVouchersProvider);
     final myRedemptionsAsync = ref.watch(myRedemptionsProvider);
-    final text = Theme.of(context).textTheme;
 
     // Vouchers are only blocked when the cart has nothing to discount
     // (i.e. free reward only, no paid treatments).
     final hasPaidItems = cart.items.any((item) => item.price > 0);
     final lockVouchers = cart.isFree && !hasPaidItems;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Voucher & Discounts'),
-        bottom: const BookingStepIndicator(currentStep: 5),
-      ),
+    return FlowScaffold(
+      title: 'Voucher & Discounts',
+      header: const BookingStepIndicator(currentStep: 5),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(kFlowGutter, 24, kFlowGutter, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -112,84 +108,44 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
 
             // ── Applied free reward ──────────────────────────────────────────
             if (cart.isFree) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.goldLight.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: AppColors.goldDark.withValues(alpha: 0.4)),
-                ),
+              FlowCard(
+                selected: true,
                 child: Row(
                   children: [
-                    Icon(Icons.card_giftcard_rounded,
-                        color: AppColors.goldDark, size: 22),
+                    const Icon(
+                      Icons.card_giftcard_rounded,
+                      color: kFlowGold,
+                      size: 22,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         cart.freeRewardTitle ?? 'Free Reward',
-                        style: text.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.goldDark),
+                        style: flowHeading(16),
                       ),
                     ),
-                    Text('Applied',
-                        style: text.labelSmall?.copyWith(
-                            color: AppColors.goldDark,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      'Applied',
+                      style: flowBody(
+                        12,
+                        weight: FontWeight.w600,
+                        color: kFlowGold,
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 10),
               // Only block vouchers when there are no paid items to discount.
               if (lockVouchers)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.amber.shade300),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded,
-                          color: Colors.amber.shade800, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Your free reward covers everything — no voucher needed.',
-                          style: text.bodySmall
-                              ?.copyWith(color: Colors.amber.shade800),
-                        ),
-                      ),
-                    ],
-                  ),
+                const _InfoBanner(
+                  text:
+                      'Your free reward covers everything — no voucher needed.',
+                  highlight: true,
                 )
               else
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded,
-                          color: AppColors.primary, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Vouchers apply to your paid treatments only.',
-                          style: text.bodySmall
-                              ?.copyWith(color: AppColors.primary),
-                        ),
-                      ),
-                    ],
-                  ),
+                const _InfoBanner(
+                  text: 'Vouchers apply to your paid treatments only.',
                 ),
               const SizedBox(height: 24),
             ],
@@ -203,20 +159,17 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('My Vouchers',
-                        style: text.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 12),
+                    const FlowSectionLabel('My Vouchers'),
+                    const SizedBox(height: 2),
                     ...clientVouchers.map((cv) {
-                      final v =
-                          (cv['voucher'] as Map<String, dynamic>?) ?? {};
+                      final v = (cv['voucher'] as Map<String, dynamic>?) ?? {};
                       final code = (v['code'] as String?) ?? '';
                       final isApplied = cart.voucher?.code == code;
                       // Skip expired
                       final exp = v['expires_at'] as String?;
-                      final expired = exp != null &&
-                          (DateTime.tryParse(exp)
-                                  ?.isBefore(DateTime.now()) ??
+                      final expired =
+                          exp != null &&
+                          (DateTime.tryParse(exp)?.isBefore(DateTime.now()) ??
                               false);
                       if (expired) return const SizedBox.shrink();
                       return Padding(
@@ -236,7 +189,7 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                     }),
                     const SizedBox(height: 8),
                     const Divider(),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                   ],
                 );
               },
@@ -251,10 +204,8 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('My Rewards',
-                        style: text.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 12),
+                    const FlowSectionLabel('My Rewards'),
+                    const SizedBox(height: 2),
                     ...redemptions.map((r) {
                       final reward =
                           (r['rewards'] as Map<String, dynamic>?) ?? {};
@@ -268,8 +219,9 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                           (reward['reward_treatment'] as Map?)?['name']
                               as String?;
                       final durationMinutes =
-                          (reward['reward_duration'] as Map?)?[
-                              'duration_minutes'] as int?;
+                          (reward['reward_duration']
+                                  as Map?)?['duration_minutes']
+                              as int?;
 
                       final isFreeType = rewardType == 'free_treatment';
                       final isApplied = isFreeType
@@ -278,8 +230,9 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                       // Free treatments are never locked — selecting one just
                       // replaces the current free reward. Discount rewards are
                       // locked when the cart has no paid items to discount.
-                      final isLocked =
-                          isFreeType ? false : (lockVouchers && !isApplied);
+                      final isLocked = isFreeType
+                          ? false
+                          : (lockVouchers && !isApplied);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -298,71 +251,42 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                     }),
                     const SizedBox(height: 8),
                     const Divider(),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                   ],
                 );
               },
             ),
 
             // ── Input ───────────────────────────────────────────────────────
-            Text('Enter Voucher Code',
-                style:
-                    text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
+            const FlowSectionLabel('Enter Voucher Code'),
+            const SizedBox(height: 2),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: TextField(
                     controller: _codeController,
                     textCapitalization: TextCapitalization.characters,
+                    style: flowBody(15, weight: FontWeight.w500),
                     decoration: InputDecoration(
                       hintText: 'e.g. KAIZEN20',
                       errorText: _errorMessage,
-                      filled: true,
-                      fillColor: AppColors.surfaceVariant
-                          .withValues(alpha: 0.4),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                            color: AppColors.border.withValues(alpha: 0.3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            BorderSide(color: AppColors.primary, width: 1.5),
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: const Color(0xFFD32F2F)),
-                      ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 17,
+                      ),
                     ),
                     onSubmitted: (_) => _applyVoucher(),
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: _isValidating ? null : _applyVoucher,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                SizedBox(
+                  width: 96,
+                  child: FlowSecondaryButton(
+                    label: 'Apply',
+                    onTap: _isValidating ? null : _applyVoucher,
+                    isLoading: _isValidating,
                   ),
-                  child: _isValidating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Apply',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -370,27 +294,16 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
             // ── Order summary ───────────────────────────────────────────────
             if (cart.discountAmount > 0) ...[
               const SizedBox(height: 32),
-              Text('Savings',
-                  style: text.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              const FlowSectionLabel('Savings'),
+              const SizedBox(height: 2),
+              FlowCard(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('You save',
-                        style: text.bodyMedium
-                            ?.copyWith(color: AppColors.primary)),
+                    Text('You save', style: flowBody(14, color: kFlowMuted)),
                     Text(
                       '-${formatRupiah(cart.discountAmount)}',
-                      style: AppTypography.headingSmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700),
+                      style: flowHeading(20, color: kFlowGold),
                     ),
                   ],
                 ),
@@ -399,27 +312,14 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-          child: FilledButton(
-            onPressed: () => context.push('/booking/review'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-            child: Text(
-              (cart.voucher != null ||
-                      cart.rewardRedemptionId != null ||
-                      cart.isFree)
-                  ? 'Continue'
-                  : 'Skip & Continue',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
+      bottomBar: FlowPrimaryButton(
+        label:
+            (cart.voucher != null ||
+                cart.rewardRedemptionId != null ||
+                cart.isFree)
+            ? 'Continue'
+            : 'Skip & Continue',
+        onTap: () => context.push('/booking/review'),
       ),
     );
   }
@@ -431,6 +331,69 @@ String _discountText(Map<String, dynamic> v) {
   if (type == 'percentage') return '${value.toInt()}% off';
   if (type == 'flat') return '${formatRupiah(value)} off';
   return '';
+}
+
+// ── Info banner ───────────────────────────────────────────────────────────────
+
+class _InfoBanner extends StatelessWidget {
+  final String text;
+  final bool highlight;
+
+  const _InfoBanner({required this.text, this.highlight = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlight ? kFlowGold : kFlowMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(kFlowRadius),
+        border: Border.all(
+          color: highlight
+              ? kFlowGold.withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.18),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: color, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: flowBody(12, color: color)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Trailing action (lock / applied / use) ────────────────────────────────────
+
+class _CardAction extends StatelessWidget {
+  final bool isLocked;
+  final bool isApplied;
+  final VoidCallback onUse;
+
+  const _CardAction({
+    required this.isLocked,
+    required this.isApplied,
+    required this.onUse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLocked) {
+      return const Icon(
+        Icons.lock_outline_rounded,
+        color: kFlowMuted,
+        size: 18,
+      );
+    }
+    if (isApplied) return const FlowCheckMark(selected: true);
+    return FlowGlassPill(label: 'Use This', onTap: onUse);
+  }
 }
 
 // ── Available voucher card ─────────────────────────────────────────────────────
@@ -456,123 +419,46 @@ class _AvailableVoucherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
-    final effectiveColor = isLocked
-        ? AppColors.surfaceVariant.withValues(alpha: 0.5)
-        : isApplied
-            ? AppColors.primaryLight.withValues(alpha: 0.2)
-            : AppColors.surface;
-    final borderColor = isLocked
-        ? AppColors.border.withValues(alpha: 0.15)
-        : isApplied
-            ? AppColors.primary.withValues(alpha: 0.5)
-            : AppColors.border.withValues(alpha: 0.2);
-    final accentColor =
-        isLocked ? AppColors.textMuted : AppColors.primary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: effectiveColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-      ),
-      child: IntrinsicHeight(
+    return Opacity(
+      opacity: isLocked ? 0.55 : 1,
+      child: FlowCard(
+        selected: isApplied,
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 6,
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(14)),
-              ),
-            ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            code,
-                            style: text.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: isLocked
-                                  ? AppColors.textMuted
-                                  : AppColors.textPrimary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          if (description != null &&
-                              description!.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(description!,
-                                style: text.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary)),
-                          ],
-                          const SizedBox(height: 2),
-                          Text(
-                            displayDiscount,
-                            style: text.bodySmall?.copyWith(
-                              color: isLocked
-                                  ? AppColors.textMuted
-                                  : AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (expiresAt != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Expires ${DateFormat('d MMM y').format(expiresAt!)}',
-                              style: text.labelSmall
-                                  ?.copyWith(color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    if (isLocked)
-                      Icon(Icons.lock_outline_rounded,
-                          color: AppColors.textMuted, size: 18)
-                    else if (isApplied)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Applied',
-                          style: text.labelSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      )
-                    else
-                      FilledButton.tonal(
-                        onPressed: onUse,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(72, 34),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 0),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Use This',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    code,
+                    style: flowHeading(17).copyWith(letterSpacing: 0.5),
+                  ),
+                  if (description != null && description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(description!, style: flowBody(12, color: kFlowMuted)),
                   ],
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    displayDiscount,
+                    style: flowBody(
+                      13,
+                      weight: FontWeight.w600,
+                      color: isLocked ? kFlowMuted : kFlowGold,
+                    ),
+                  ),
+                  if (expiresAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Expires ${DateFormat('d MMM y').format(expiresAt!)}',
+                      style: flowBody(11, color: kFlowMuted),
+                    ),
+                  ],
+                ],
               ),
             ),
+            const SizedBox(width: 12),
+            _CardAction(isLocked: isLocked, isApplied: isApplied, onUse: onUse),
           ],
         ),
       ),
@@ -620,50 +506,23 @@ class _SelectableRewardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
-    final cardColor = isLocked
-        ? AppColors.surfaceVariant.withValues(alpha: 0.5)
-        : isApplied
-            ? AppColors.goldLight.withValues(alpha: 0.3)
-            : AppColors.surface;
-    final borderColor = isLocked
-        ? AppColors.border.withValues(alpha: 0.15)
-        : isApplied
-            ? AppColors.goldDark.withValues(alpha: 0.5)
-            : AppColors.border.withValues(alpha: 0.2);
-    final iconBg = isLocked
-        ? AppColors.surfaceVariant
-        : isApplied
-            ? AppColors.goldLight
-            : AppColors.surfaceVariant;
-    final iconColor = isLocked
-        ? AppColors.textMuted
-        : isApplied
-            ? AppColors.goldDark
-            : AppColors.textMuted;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+    return Opacity(
+      opacity: isLocked ? 0.55 : 1,
+      child: FlowCard(
+        selected: isApplied,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(kFlowRadius),
               ),
               child: Icon(
                 Icons.card_giftcard_rounded,
-                color: iconColor,
+                color: isApplied ? kFlowGold : kFlowMuted,
                 size: 20,
               ),
             ),
@@ -672,57 +531,25 @@ class _SelectableRewardCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: text.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(title, style: flowHeading(16)),
                   if (description != null && description!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(description!,
-                        style: text.bodySmall
-                            ?.copyWith(color: AppColors.textSecondary)),
+                    const SizedBox(height: 4),
+                    Text(description!, style: flowBody(12, color: kFlowMuted)),
                   ],
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     _rewardLabel,
-                    style: text.bodySmall?.copyWith(
-                      color: AppColors.goldDark,
-                      fontWeight: FontWeight.w600,
+                    style: flowBody(
+                      13,
+                      weight: FontWeight.w600,
+                      color: isLocked ? kFlowMuted : kFlowGold,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            if (isLocked)
-              Icon(Icons.lock_outline_rounded,
-                  color: AppColors.textMuted, size: 18)
-            else if (isApplied)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.goldDark,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Applied',
-                  style: text.labelSmall?.copyWith(
-                      color: Colors.white, fontWeight: FontWeight.w700),
-                ),
-              )
-            else
-              FilledButton.tonal(
-                onPressed: onUse,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(72, 34),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 0),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Use This',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
+            _CardAction(isLocked: isLocked, isApplied: isApplied, onUse: onUse),
           ],
         ),
       ),
@@ -745,38 +572,39 @@ class _AppliedVoucherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-      ),
+    return FlowCard(
+      selected: true,
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
         children: [
-          Icon(Icons.local_offer_rounded, color: AppColors.primary, size: 22),
+          const Icon(Icons.local_offer_rounded, color: kFlowGold, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(voucher.code as String,
-                    style: text.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary)),
+                Text(
+                  voucher.code as String,
+                  style: flowHeading(17).copyWith(letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 2),
                 Text(
                   '${voucher.displayDiscount} applied',
-                  style: text.bodySmall
-                      ?.copyWith(color: AppColors.textSecondary),
+                  style: flowBody(
+                    12,
+                    weight: FontWeight.w500,
+                    color: kFlowGold,
+                  ),
                 ),
               ],
             ),
           ),
           TextButton(
             onPressed: onRemove,
-            child: Text('Remove',
-                style: TextStyle(color: const Color(0xFFD32F2F), fontSize: 13)),
+            child: Text(
+              'Remove',
+              style: flowBody(13, color: const Color(0xFFFFB4A8)),
+            ),
           ),
         ],
       ),

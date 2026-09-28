@@ -55,9 +55,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> signOut() => _client.auth.signOut();
 
   AppUser _mapUser(User user) => AppUser(
-        id: user.id,
-        email: user.email ?? '',
-        name: user.userMetadata?['name'] as String?,
-        avatarUrl: user.userMetadata?['avatar_url'] as String?,
-      );
+    id: user.id,
+    email: user.email ?? '',
+    name: user.userMetadata?['name'] as String?,
+    avatarUrl: user.userMetadata?['avatar_url'] as String?,
+  );
 }

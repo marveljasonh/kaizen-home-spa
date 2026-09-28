@@ -24,7 +24,9 @@ class AddressRepository {
         .eq('client_id', userId)
         .order('is_default', ascending: false)
         .order('created_at', ascending: false);
-    return (data as List).map((e) => SavedAddress.fromJson(e as Map<String, dynamic>)).toList();
+    return (data as List)
+        .map((e) => SavedAddress.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> addAddress({
@@ -47,6 +49,33 @@ class AddressRepository {
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       'is_default': isDefault,
     });
+  }
+
+  /// Updates an existing address. Making it the default clears the flag on
+  /// the client's other addresses first (as [addAddress] does).
+  Future<void> updateAddress({
+    required String id,
+    required String userId,
+    required String label,
+    required String fullAddress,
+    String? notes,
+    bool isDefault = false,
+  }) async {
+    if (isDefault) {
+      await _client
+          .from('saved_addresses')
+          .update({'is_default': false})
+          .eq('client_id', userId);
+    }
+    await _client
+        .from('saved_addresses')
+        .update({
+          'label': label,
+          'full_address': fullAddress,
+          'notes': (notes != null && notes.isNotEmpty) ? notes : null,
+          'is_default': isDefault,
+        })
+        .eq('id', id);
   }
 
   Future<void> deleteAddress(String id) async {

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/flow_widgets.dart';
 import '../../domain/entities/therapist.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
@@ -18,35 +18,36 @@ class TherapistSelectionPage extends ConsumerWidget {
     final cart = ref.watch(bookingCartProvider);
     final selectedTherapist = cart.therapist;
 
-    // Derive the exact scheduled datetime from cart selection
-    final scheduledAt = (cart.selectedDate != null && cart.selectedTimeSlot != null)
-        ? DateTime(
-            cart.selectedDate!.year,
-            cart.selectedDate!.month,
-            cart.selectedDate!.day,
-            cart.selectedTimeSlot!.hour,
-          )
-        : null;
+    // UTC start time, set once the user has been through the Schedule step.
+    final scheduledAt = cart.scheduledAt;
 
     final bookedIds = ref
         .watch(bookedTherapistIdsProvider(scheduledAt))
         .maybeWhen(data: (ids) => ids, orElse: () => const <String>{});
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Select Therapist'),
-        bottom: const BookingStepIndicator(currentStep: 2),
-      ),
+    return FlowScaffold(
+      title: 'Choose Therapist',
+      header: const BookingStepIndicator(currentStep: 2),
       body: therapistsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _buildTherapistList(
-            context, ref, const [], selectedTherapist, bookedIds),
-        data: (therapists) =>
-            _buildTherapistList(context, ref, therapists, selectedTherapist, bookedIds),
+          context,
+          ref,
+          const [],
+          selectedTherapist,
+          bookedIds,
+        ),
+        data: (therapists) => _buildTherapistList(
+          context,
+          ref,
+          therapists,
+          selectedTherapist,
+          bookedIds,
+        ),
       ),
-      bottomNavigationBar: _ContinueBar(
-        onContinue: () => context.push('/booking/schedule'),
+      bottomBar: FlowPrimaryButton(
+        label: 'Continue',
+        onTap: () => context.push('/booking/schedule'),
       ),
     );
   }
@@ -60,35 +61,41 @@ Widget _buildTherapistList(
   Set<String> bookedIds,
 ) {
   return RefreshIndicator(
-    color: AppColors.primary,
-    backgroundColor: AppColors.surface,
+    color: kFlowPageColor,
+    backgroundColor: Colors.white,
     onRefresh: () async => ref.invalidate(therapistsProvider),
     child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(kFlowGutter, 20, kFlowGutter, 20),
       children: [
-        // ── Pick Any (always at top) ────────────────────────────────────────
+        // ── Any available (always at top, the default) ──────────────────────
         _TherapistTile(
           isSelected: selectedTherapist == null,
-          name: 'Pick Any Therapist',
-          subtitle: "We'll assign the best available therapist for your booking",
-          avatarChild: const Icon(Icons.people_rounded, size: 26),
+          name: 'Any Available Therapist',
+          subtitle:
+              "We'll assign the best available therapist for your booking",
+          avatarChild: const Icon(
+            Icons.people_rounded,
+            size: 26,
+            color: Colors.white,
+          ),
           onTap: () =>
               ref.read(bookingCartProvider.notifier).selectTherapist(null),
         ),
 
-        if (therapists.isNotEmpty) ...[
+        // Specific therapists are only those who have treated this client.
+        if (therapists.isEmpty) ...[
           const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              'Therapists',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
+          Text(
+            'You can choose a specific therapist after your first completed '
+            'treatment.',
+            style: flowBody(12, color: kFlowMuted, height: 1.4),
           ),
+        ],
+
+        if (therapists.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const FlowSectionLabel('Your therapists'),
           ...therapists.map(
             (t) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -149,95 +156,77 @@ class _TherapistTile extends StatelessWidget {
   void _handleUnavailableTap(BuildContext context) {
     final String message;
     if (!isAvailable) {
-      message = 'This therapist is not working today';
+      message = 'This therapist is currently unavailable';
     } else if (isBookedAtTime) {
       message = 'This therapist is already booked at your selected time';
     } else {
       message = 'This therapist is not available';
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
     final showBadge = status != null || isBookedAtTime;
 
     return Opacity(
       opacity: _effectiveAvailable ? 1.0 : 0.6,
-      child: GestureDetector(
-        onTap: _effectiveAvailable ? onTap : () => _handleUnavailableTap(context),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryLight.withValues(alpha: 0.5)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.primary
-                  : AppColors.border.withValues(alpha: 0.2),
-              width: isSelected ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              _Avatar(
-                name: name,
-                avatarUrl: avatarUrl,
-                avatarChild: avatarChild,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: text.bodyLarge
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(subtitle,
-                          style: text.bodySmall
-                              ?.copyWith(color: AppColors.textSecondary),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                    if (rating != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded,
-                              size: 14, color: Color(0xFFFFC107)),
-                          const SizedBox(width: 3),
-                          Text(
-                            rating!.toStringAsFixed(1),
-                            style: text.labelSmall?.copyWith(
-                                color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (showBadge) ...[
-                      const SizedBox(height: 8),
-                      _TherapistStatusBadge(
-                        status: status,
-                        isAvailable: isAvailable,
-                        isBookedAtTime: isBookedAtTime,
-                      ),
-                    ],
+      child: FlowCard(
+        selected: isSelected,
+        onTap: _effectiveAvailable
+            ? onTap
+            : () => _handleUnavailableTap(context),
+        child: Row(
+          children: [
+            _Avatar(name: name, avatarUrl: avatarUrl, avatarChild: avatarChild),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: flowHeading(20, height: 1.2)),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: flowBody(12, color: kFlowMuted, height: 1.35),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
+                  if (rating != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: kFlowGold,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          rating!.toStringAsFixed(1),
+                          style: flowBody(12, weight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (showBadge) ...[
+                    const SizedBox(height: 8),
+                    _TherapistStatusBadge(
+                      status: status,
+                      isAvailable: isAvailable,
+                      isBookedAtTime: isBookedAtTime,
+                    ),
+                  ],
+                ],
               ),
-              if (isSelected)
-                Icon(Icons.check_circle_rounded,
-                    color: AppColors.primary, size: 22),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            FlowCheckMark(selected: isSelected),
+          ],
         ),
       ),
     );
@@ -263,9 +252,9 @@ class _TherapistStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 0.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -273,19 +262,12 @@ class _TherapistStatusBadge extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
+            style: flowBody(11, weight: FontWeight.w600, color: color),
           ),
         ],
       ),
@@ -309,13 +291,13 @@ String _statusLabel(String? status, bool isAvailable, bool isBookedAtTime) {
 Color _statusColor(String? status, bool isAvailable, bool isBookedAtTime) {
   if (!isAvailable) {
     return switch (status) {
-      'on_duty' => const Color(0xFF856404),
-      'break' => const Color(0xFF0C5460),
-      _ => const Color(0xFF6B6B68),
+      'on_duty' => kFlowGold,
+      'break' => const Color(0xFF9FD3DC),
+      _ => kFlowMuted,
     };
   }
-  if (isBookedAtTime) return const Color(0xFF856404);
-  return const Color(0xFF155724);
+  if (isBookedAtTime) return kFlowGold;
+  return const Color(0xFFB5DDA4);
 }
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
@@ -340,10 +322,10 @@ class _Avatar extends StatelessWidget {
           width: 56,
           height: 56,
           fit: BoxFit.cover,
-          placeholder: (_, __) => _InitialsCircle(
-              name: name, avatarChild: avatarChild),
-          errorWidget: (_, __, ___) => _InitialsCircle(
-              name: name, avatarChild: avatarChild),
+          placeholder: (_, __) =>
+              _InitialsCircle(name: name, avatarChild: avatarChild),
+          errorWidget: (_, __, ___) =>
+              _InitialsCircle(name: name, avatarChild: avatarChild),
         ),
       );
     }
@@ -355,61 +337,35 @@ class _InitialsCircle extends StatelessWidget {
   final String name;
   final Widget? avatarChild;
 
-  const _InitialsCircle(
-      {required this.name, required this.avatarChild});
+  const _InitialsCircle({required this.name, required this.avatarChild});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 56,
       height: 56,
-      decoration: const BoxDecoration(
-        color: AppColors.primaryLight,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
       ),
       alignment: Alignment.center,
-      child: avatarChild ??
+      child:
+          avatarChild ??
           Text(
             name.trim().isEmpty
                 ? '?'
                 : name
-                    .trim()
-                    .split(' ')
-                    .take(2)
-                    .map((w) => w[0].toUpperCase())
-                    .join(),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
-            ),
+                      .trim()
+                      .split(' ')
+                      .take(2)
+                      .map((w) => w[0].toUpperCase())
+                      .join(),
+            style: flowHeading(20),
           ),
-    );
-  }
-}
-
-// ── Continue bar ───────────────────────────────────────────────────────────────
-
-class _ContinueBar extends StatelessWidget {
-  final VoidCallback? onContinue;
-  const _ContinueBar({this.onContinue});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-        child: FilledButton(
-          onPressed: onContinue,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-          ),
-          child: const Text('Continue',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        ),
-      ),
     );
   }
 }

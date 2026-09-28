@@ -18,12 +18,12 @@ class SavedAddress {
   });
 
   factory SavedAddress.fromJson(Map<String, dynamic> json) => SavedAddress(
-        id: json['id'] as String,
-        clientId: json['client_id'] as String,
-        label: json['label'] as String,
-        fullAddress: json['full_address'] as String,
-        notes: json['notes'] as String?,
-        isDefault: json['is_default'] as bool? ?? false,
-        createdAt: DateTime.parse(json['created_at'] as String),
-      );
+    id: json['id'] as String,
+    clientId: json['client_id'] as String,
+    label: json['label'] as String,
+    fullAddress: json['full_address'] as String,
+    notes: json['notes'] as String?,
+    isDefault: json['is_default'] as bool? ?? false,
+    createdAt: DateTime.parse(json['created_at'] as String),
+  );
 }

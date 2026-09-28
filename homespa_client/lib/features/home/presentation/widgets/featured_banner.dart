@@ -182,7 +182,8 @@ class _BannerItem extends StatelessWidget {
                   color: AppColors.gold.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.4)),
+                    color: AppColors.gold.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Text(
                   data.ctaLabel.toUpperCase(),

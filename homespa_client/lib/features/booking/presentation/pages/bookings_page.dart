@@ -1,434 +1,417 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/utils/currency_formatter.dart';
-import '../../../../core/utils/timezone_helper.dart';
+import '../../../treatments/presentation/widgets/glass_icon_button.dart';
+import '../../domain/entities/order_filters.dart';
+import '../../domain/entities/order_summary.dart';
 import '../providers/booking_providers.dart';
+import '../providers/order_history_providers.dart';
+import '../widgets/order_card.dart';
+import '../widgets/order_filter_sheet.dart';
 
-const _upcomingStatuses = {
-  'pending',
-  'accepted',
-  'therapist_assigned',
-  'rider_assigned',
-  'on_the_way',
-  'arrived',
-  'in_progress',
-};
+// History / Activities (Bookings tab; Home → Recent Orders → "View All").
+// The hero reuses the Home hero (Figma 503:268) values; the cards are the
+// shared OrderCard at 341×228.87 (Figma 1637:4949).
 
-const _pastStatuses = {'completed', 'cancelled'};
+const String _kHeroImage = 'assets/images/home/hero.png';
+const String _kIconSearch = 'assets/icons/search_24.svg';
 
-class BookingsPage extends ConsumerWidget {
-  const BookingsPage({super.key});
+const double _kGutterLeft = 30;
+const double _kGutterRight = 31;
+const double _kCardGap = 14;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+/// Gap between the Search and Filter buttons (not yet checked against Figma).
+const double _kHeaderButtonGap = 10;
+const double _kHeroRadius = 40;
+const double _kTabsTop = 150;
+const double _kTabHeight = 54;
 
-    if (userId == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(child: Text('Please log in to view your bookings.')),
-      );
+/// 70px taller than the tabs need (was 33 below them), so the hero runs on
+/// under the first order card.
+const double _kHeroHeight = _kTabsTop + _kTabHeight + 33 + 70;
+
+/// Tabs → first order card (Figma: 25). The hero runs on under the card.
+const double _kTabsToCards = 25;
+
+enum BookingsTab {
+  upcoming('Upcoming', 'No upcoming bookings right now.'),
+  past('Past', 'You haven’t booked any treatments yet.');
+
+  const BookingsTab(this.label, this.emptyMessage);
+  final String label;
+  final String emptyMessage;
+
+  /// Upcoming: status NOT IN (completed, cancelled). Past: IN.
+  bool matches(OrderSummary o) => switch (this) {
+    BookingsTab.upcoming => !o.isCompleted && !o.isCancelled,
+    BookingsTab.past => o.isCompleted || o.isCancelled,
+  };
+
+  /// `?tab=past` (Home "View All"); older `?filter=completed|cancelled` too.
+  static BookingsTab fromQuery(Map<String, String> query) {
+    final tab = query['tab'];
+    final filter = query['filter'];
+    if (tab == 'past' || filter == 'completed' || filter == 'cancelled') {
+      return BookingsTab.past;
     }
-
-    final streamAsync = ref.watch(bookingHistoryStreamProvider(userId));
-
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: Text('My Bookings',
-              style: AppTypography.headingMedium
-                  .copyWith(color: AppColors.textPrimary)),
-          centerTitle: false,
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Upcoming'),
-              Tab(text: 'Past'),
-            ],
-            labelStyle: TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-        body: streamAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => _ErrorState(
-            onRetry: () =>
-                ref.invalidate(bookingHistoryStreamProvider(userId)),
-          ),
-          data: (bookings) {
-            final upcoming = bookings
-                .where((b) =>
-                    _upcomingStatuses.contains(b['status'] as String? ?? ''))
-                .toList();
-            final past = bookings
-                .where((b) =>
-                    _pastStatuses.contains(b['status'] as String? ?? ''))
-                .toList();
-            final refresh = () async {
-              ref.invalidate(bookingHistoryStreamProvider(userId));
-            };
-            return TabBarView(
-              children: [
-                _BookingsList(
-                  bookings: upcoming,
-                  emptyIcon: Icons.event_available_rounded,
-                  emptyMessage: 'No upcoming bookings',
-                  emptySubtitle: 'Your confirmed sessions will appear here.',
-                  onRefresh: refresh,
-                ),
-                _BookingsList(
-                  bookings: past,
-                  emptyIcon: Icons.history_rounded,
-                  emptyMessage: 'No past bookings',
-                  emptySubtitle:
-                      'Completed and cancelled bookings will appear here.',
-                  onRefresh: refresh,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
+    return BookingsTab.upcoming;
   }
 }
 
-// ── List ───────────────────────────────────────────────────────────────────────
+class BookingsPage extends ConsumerStatefulWidget {
+  final BookingsTab initialTab;
+  const BookingsPage({super.key, this.initialTab = BookingsTab.upcoming});
 
-class _BookingsList extends StatelessWidget {
-  final List<Map<String, dynamic>> bookings;
-  final IconData emptyIcon;
-  final String emptyMessage;
-  final String emptySubtitle;
-  final Future<void> Function()? onRefresh;
+  @override
+  ConsumerState<BookingsPage> createState() => _BookingsPageState();
+}
 
-  const _BookingsList({
-    required this.bookings,
-    required this.emptyIcon,
-    required this.emptyMessage,
-    required this.emptySubtitle,
-    this.onRefresh,
+class _BookingsPageState extends ConsumerState<BookingsPage> {
+  late BookingsTab _tab = widget.initialTab;
+  final _searchController = TextEditingController();
+  final _scroll = ScrollController();
+  bool _searching = false;
+  String _query = '';
+  OrderFilters _filters = OrderFilters.none;
+
+  @override
+  void didUpdateWidget(covariant BookingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-entering via "View All" while the tab is alive switches to Past.
+    if (oldWidget.initialTab != widget.initialTab) _tab = widget.initialTab;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() => setState(() {
+    _searching = !_searching;
+    if (!_searching) {
+      _searchController.clear();
+      _query = '';
+    }
   });
 
-  @override
-  Widget build(BuildContext context) {
-    if (bookings.isEmpty) {
-      final emptyWidget = ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-          _EmptyState(
-              icon: emptyIcon, message: emptyMessage, subtitle: emptySubtitle),
-        ],
-      );
-      if (onRefresh != null) {
-        return RefreshIndicator(
-          color: AppColors.primary,
-          backgroundColor: AppColors.surface,
-          onRefresh: onRefresh!,
-          child: emptyWidget,
-        );
-      }
-      return emptyWidget;
-    }
-    return RefreshIndicator(
-      color: AppColors.primary,
-      backgroundColor: AppColors.surface,
-      onRefresh: onRefresh ?? () async {},
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        itemCount: bookings.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
-        itemBuilder: (context, i) => _BookingCard(
-          booking: bookings[i],
-          onTap: () {
-            final id = bookings[i]['id'] as String?;
-            print('[BookingsPage] navigating to detail, bookingId: $id');
-            context.push('/bookings/$id');
-          },
-        ),
-      ),
-    );
+  Future<void> _openFilters() async {
+    final result = await showOrderFilterSheet(context, _filters);
+    if (result != null && mounted) setState(() => _filters = result);
   }
-}
 
-// ── Card ───────────────────────────────────────────────────────────────────────
+  bool _matchesQuery(OrderSummary o) {
+    if (_query.isEmpty) return true;
+    final q = _query.toLowerCase();
+    return o.code.toLowerCase().contains(q) ||
+        o.items.any((i) => i.treatmentName.toLowerCase().contains(q));
+  }
 
-class _BookingCard extends StatelessWidget {
-  final Map<String, dynamic> booking;
-  final VoidCallback? onTap;
-  const _BookingCard({required this.booking, this.onTap});
+  Future<void> _refresh() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId != null) ref.invalidate(bookingHistoryStreamProvider(userId));
+    ref.invalidate(orderHistoryProvider);
+    try {
+      await ref.read(orderHistoryProvider.future);
+    } catch (_) {
+      // The error state is shown by the list itself.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    // Signed-out users are redirected to login by the router; the provider
+    // also returns an empty list without a user.
+    final ordersAsync = ref.watch(orderHistoryProvider);
+    // Treatment ids for the selected categories (Supabase `treatments` query).
+    final categoryTreatmentIds = _filters.categoryIds.isEmpty
+        ? null
+        : ref.watch(
+            categoryTreatmentIdsProvider(categoryKeyOf(_filters.categoryIds)),
+          );
 
-    final status = booking['status'] as String? ?? 'pending';
-    final bookingId = booking['id'] as String? ?? '';
-    final total = (booking['total_amount'] as num?)?.toDouble() ?? 0.0;
-    final discount = (booking['discount_amount'] as num?)?.toDouble() ?? 0.0;
-    final address = booking['address_snapshot'] as String? ?? '—';
-    final hasTherapist = booking['therapist_id'] != null;
-    final statusColor = _statusColor(status);
-
-    DateTime? scheduledAt;
-    final scheduledRaw = booking['scheduled_at'] as String?;
-    if (scheduledRaw != null) {
-      scheduledAt = DateTime.tryParse(scheduledRaw);
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.spa_rounded,
-                        color: AppColors.primary, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kaizen Spa Service',
-                          style: text.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '#${bookingId.length >= 8 ? bookingId.substring(0, 8).toUpperCase() : bookingId.toUpperCase()}',
-                          style: text.labelSmall
-                              ?.copyWith(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _StatusBadge(
-                    label: _statusLabel(status),
-                    color: statusColor,
-                  ),
-                ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.darkOliveLight, // #4E523B
+        body: RefreshIndicator(
+          color: AppColors.cream,
+          backgroundColor: AppColors.darkOlive,
+          onRefresh: _refresh,
+          // Layered hero: the photo/gradient layer sits *behind* the scroll
+          // view and moves with it, so the order cards slide over its lower
+          // edge. Title, buttons and tabs scroll in the first sliver on top.
+          child: Stack(
+            children: [
+              ListenableBuilder(
+                listenable: _scroll,
+                builder: (context, child) {
+                  final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+                  return Transform.translate(
+                    offset: Offset(0, -offset.clamp(0.0, _kHeroHeight + 40)),
+                    child: child,
+                  );
+                },
+                child: const _HeroBackground(),
               ),
-            ),
-
-            const Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: AppColors.border),
-
-            // ── Detail rows ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                children: [
-                  if (scheduledAt != null)
-                    _DetailRow(
-                      icon: Icons.calendar_today_rounded,
-                      label: _formatDate(scheduledAt),
-                      text: text,
+              CustomScrollView(
+                controller: _scroll,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    // Ends 25px below the tabs, so the cards start over the hero.
+                    child: SizedBox(
+                      height: _kTabsTop + _kTabHeight + _kTabsToCards,
+                      child: _HeroContent(
+                        tab: _tab,
+                        onTab: (t) => setState(() => _tab = t),
+                        onSearch: _toggleSearch,
+                        onFilter: _openFilters,
+                        activeFilterCount: _filters.activeCount,
+                      ),
                     ),
-                  const SizedBox(height: 8),
-                  _DetailRow(
-                    icon: Icons.person_outline_rounded,
-                    label: hasTherapist ? 'Therapist Assigned' : 'Finding therapist…',
-                    text: text,
                   ),
-                  const SizedBox(height: 8),
-                  _DetailRow(
-                    icon: Icons.location_on_outlined,
-                    label: address,
-                    text: text,
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Footer ───────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (discount > 0)
-                    Text(
-                      'Saved ${formatRupiah(discount)}',
-                      style: text.labelSmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                  if (_searching)
+                    SliverToBoxAdapter(
+                      child: _SearchField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _query = v.trim()),
+                        onClose: _toggleSearch,
                       ),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  Row(
-                    children: [
-                      Text(
-                        formatRupiah(total),
-                        style: text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      OutlinedButton(
-                        onPressed: onTap,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 32),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 0),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          side: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.5)),
-                        ),
-                        child: Text(
-                          'View Details',
-                          style: text.labelSmall?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                    ),
+                  ...ordersAsync.when(
+                    loading: () => [const _SkeletonSliver()],
+                    error: (_, __) => [
+                      _MessageSliver(
+                        'We couldn’t load your orders right now.',
+                        onRetry: _refresh,
                       ),
                     ],
+                    data: (orders) {
+                      if (categoryTreatmentIds != null &&
+                          !categoryTreatmentIds.hasValue) {
+                        return categoryTreatmentIds.hasError
+                            ? [
+                                _MessageSliver(
+                                  'We couldn’t apply the category filter.',
+                                  onRetry: _refresh,
+                                ),
+                              ]
+                            : [const _SkeletonSliver()];
+                      }
+                      final treatmentIds = categoryTreatmentIds?.value;
+                      final visible = orders
+                          .where(_tab.matches)
+                          .where(_matchesQuery)
+                          .where((o) => _filters.matchesDate(o.scheduledAt))
+                          .where(
+                            (o) =>
+                                treatmentIds == null ||
+                                o.items.any(
+                                  (i) => treatmentIds.contains(i.treatmentId),
+                                ),
+                          )
+                          .toList();
+                      if (visible.isEmpty) {
+                        return [
+                          _PaddedSliver(
+                            SliverToBoxAdapter(
+                              child: OrderEmptyState(
+                                message: _query.isNotEmpty
+                                    ? 'No orders match “$_query”.'
+                                    : !_filters.isEmpty
+                                    ? 'No orders match these filters.'
+                                    : _tab.emptyMessage,
+                              ),
+                            ),
+                          ),
+                        ];
+                      }
+                      // Lazily built, so long histories scroll smoothly.
+                      return [
+                        _PaddedSliver(
+                          SliverList.separated(
+                            itemCount: visible.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: _kCardGap),
+                            // Full width minus gutters → 341 × 228.87 at 402pt.
+                            itemBuilder: (_, i) => OrderCard(
+                              key: ValueKey(visible[i].id),
+                              order: visible[i],
+                              showStatus: true,
+                            ),
+                          ),
+                        ),
+                      ];
+                    },
                   ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 25)),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-
-  static String _formatDate(DateTime dt) {
-    final wib = WIB.toWIB(dt);
-    final date = DateFormat('EEE, d MMM y').format(wib);
-    final time = DateFormat('HH:mm').format(wib);
-    return '$date • $time WIB';
-  }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Hero ─────────────────────────────────────────────────────────────────────
 
-String _statusLabel(String status) => switch (status) {
-      'pending' => 'Pending',
-      'accepted' => 'Accepted',
-      'therapist_assigned' => 'Assigned',
-      'rider_assigned' => 'On the Way',
-      'on_the_way' => 'On the Way',
-      'arrived' => 'Arrived',
-      'in_progress' => 'In Progress',
-      'completed' => 'Completed',
-      'cancelled' => 'Cancelled',
-      _ => status,
-    };
+const _kHeroCorners = BorderRadius.only(
+  bottomLeft: Radius.circular(_kHeroRadius),
+  bottomRight: Radius.circular(_kHeroRadius),
+);
 
-Color _statusColor(String status) => switch (status) {
-      'pending' => const Color(0xFFF59E0B),
-      'accepted' ||
-      'therapist_assigned' ||
-      'rider_assigned' ||
-      'on_the_way' ||
-      'arrived' =>
-        const Color(0xFF3B82F6),
-      'in_progress' => const Color(0xFF8B5CF6),
-      'completed' => const Color(0xFF10B981),
-      'cancelled' => const Color(0xFF6B7280),
-      _ => AppColors.textSecondary,
-    };
-
-// ── Status badge ───────────────────────────────────────────────────────────────
-
-class _StatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _StatusBadge({required this.label, required this.color});
+/// Hero photo layer (Home hero values: photo, 33%→77% gradient, 40px bottom
+/// corners, shadows). Painted behind the scroll view.
+class _HeroBackground extends StatelessWidget {
+  const _HeroBackground();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+      height: _kHeroHeight,
+      decoration: const BoxDecoration(
+        borderRadius: _kHeroCorners,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x26000000), // 15%
+            blurRadius: 9.4,
+            offset: Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Color(0x54000000), // 33%
+            blurRadius: 26.3,
+            spreadRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+      child: ClipRRect(
+        borderRadius: _kHeroCorners,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(_kHeroImage, fit: BoxFit.cover),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x54000000), Color(0xC4000000)], // 33% → 77%
+                ),
+              ),
+            ),
+            // Approximates Figma's inset shadow (0 3 7.8 4, white 12%).
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: _kHeroCorners,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Detail row ─────────────────────────────────────────────────────────────────
+/// Hero foreground: "History" / "Activities", search, and the tabs.
+class _HeroContent extends StatelessWidget {
+  final BookingsTab tab;
+  final ValueChanged<BookingsTab> onTab;
+  final VoidCallback onSearch;
+  final VoidCallback onFilter;
+  final int activeFilterCount;
 
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final TextTheme text;
-  final int maxLines;
-
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.text,
-    this.maxLines = 2,
+  const _HeroContent({
+    required this.tab,
+    required this.onTab,
+    required this.onSearch,
+    required this.onFilter,
+    required this.activeFilterCount,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
       children: [
-        Icon(icon, size: 15, color: AppColors.textMuted),
-        const SizedBox(width: 8),
-        Expanded(
+        Positioned(
+          top: 63,
+          left: _kGutterLeft,
           child: Text(
-            label,
-            style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
-            maxLines: maxLines,
-            overflow: TextOverflow.ellipsis,
+            'History',
+            style: GoogleFonts.montserrat(
+              fontSize: 25,
+              fontWeight: FontWeight.w400,
+              color: Colors.white,
+              height: 31.584 / 25,
+            ),
+          ),
+        ),
+        const Positioned(
+          top: 98,
+          left: _kGutterLeft,
+          child: Text(
+            'Activities',
+            style: TextStyle(
+              fontFamily: 'CalSans',
+              fontWeight: FontWeight.w600,
+              fontSize: 40,
+              color: Colors.white,
+              height: 31.584 / 40,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 72,
+          right: _kGutterRight,
+          child: Row(
+            children: [
+              GlassIconButton(
+                icon: Icons.tune_rounded,
+                iconSize: 24,
+                fillAlpha: 0.20,
+                badgeCount: activeFilterCount,
+                onTap: onFilter,
+              ),
+              const SizedBox(width: _kHeaderButtonGap),
+              GlassIconButton(
+                svgAsset: _kIconSearch,
+                iconSize: 25.565,
+                iconOffset: const Offset(11.72, 11.72),
+                fillAlpha: 0.20,
+                onTap: onSearch,
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: _kTabsTop,
+          left: _kGutterLeft,
+          right: _kGutterRight,
+          child: Row(
+            children: [
+              for (final t in BookingsTab.values) ...[
+                if (t != BookingsTab.values.first) const SizedBox(width: 21),
+                Expanded(
+                  child: _TabPill(
+                    label: t.label,
+                    active: t == tab,
+                    onTap: () => onTab(t),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
@@ -436,72 +419,183 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-// ── Empty state ────────────────────────────────────────────────────────────────
+/// Active: white with dark olive text. Inactive: olive with white text.
+class _TabPill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
 
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  final String subtitle;
-  const _EmptyState(
-      {required this.icon, required this.message, required this.subtitle});
+  const _TabPill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                size: 56,
-                color: AppColors.textMuted.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              style: text.titleMedium?.copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
+    return Semantics(
+      selected: active,
+      button: true,
+      child: Material(
+        color: active ? Colors.white : AppColors.darkOliveLight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          onTap: onTap,
+          child: SizedBox(
+            height: _kTabHeight,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                style: GoogleFonts.montserrat(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w400,
+                  color: active ? AppColors.darkOliveLight : Colors.white,
+                ),
+              ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: text.bodySmall?.copyWith(color: AppColors.textMuted),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Error state ────────────────────────────────────────────────────────────────
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClose;
 
-class _ErrorState extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _ErrorState({required this.onRetry});
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 48, color: AppColors.textMuted),
-          const SizedBox(height: 12),
-          Text('Could not load bookings',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: onRetry,
-            child: const Text('Retry'),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_kGutterLeft, 16, _kGutterRight, 0),
+      child: TextField(
+        controller: controller,
+        autofocus: true,
+        onChanged: onChanged,
+        cursorColor: Colors.white,
+        style: GoogleFonts.montserrat(fontSize: 14, color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search by treatment or order code',
+          hintStyle: GoogleFonts.montserrat(
+            fontSize: 14,
+            color: AppColors.textOnDarkMuted,
           ),
-        ],
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+          suffixIcon: IconButton(
+            tooltip: 'Close search',
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
+            onPressed: onClose,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 0.5,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 0.5,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Loading / message states ─────────────────────────────────────────────────
+
+class _PaddedSliver extends StatelessWidget {
+  final Widget sliver;
+  const _PaddedSliver(this.sliver);
+
+  @override
+  Widget build(BuildContext context) => SliverPadding(
+    padding: const EdgeInsets.fromLTRB(_kGutterLeft, 0, _kGutterRight, 0),
+    sliver: sliver,
+  );
+}
+
+class _SkeletonSliver extends StatelessWidget {
+  const _SkeletonSliver();
+
+  @override
+  Widget build(BuildContext context) {
+    return _PaddedSliver(
+      SliverList.separated(
+        itemCount: 3,
+        separatorBuilder: (_, __) => const SizedBox(height: _kCardGap),
+        itemBuilder: (_, __) => AspectRatio(
+          aspectRatio: OrderCard.designWidth / OrderCard.designHeight,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.darkOlive,
+              borderRadius: BorderRadius.circular(4.603 * 341 / 222),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageSliver extends StatelessWidget {
+  final String message;
+  final Future<void> Function()? onRetry;
+  const _MessageSliver(this.message, {this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return _PaddedSliver(
+      SliverToBoxAdapter(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.montserrat(
+                fontSize: 13,
+                color: AppColors.textOnDarkMuted,
+              ),
+            ),
+            if (onRetry != null)
+              TextButton(
+                onPressed: onRetry,
+                child: Text(
+                  'Retry',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.cream,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

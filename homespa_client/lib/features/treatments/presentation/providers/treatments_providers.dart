@@ -48,11 +48,12 @@ class _SelectedCategoryNotifier extends Notifier<String?> {
 
 final selectedCategoryIdProvider =
     NotifierProvider<_SelectedCategoryNotifier, String?>(
-  _SelectedCategoryNotifier.new,
-);
+      _SelectedCategoryNotifier.new,
+    );
 
-final selectedDurationIdProvider =
-    StateProvider.family<String?, String>((ref, treatmentId) => null);
+final selectedDurationIdProvider = StateProvider.family<String?, String>(
+  (ref, treatmentId) => null,
+);
 
 // Pending category name set from outside (e.g. Home page category chips)
 // The TreatmentsPage resolves this to an ID once categories are loaded.
@@ -71,8 +72,10 @@ final categoriesProvider = FutureProvider<List<TreatmentCategory>>((ref) async {
   );
 });
 
-final treatmentsProvider =
-    FutureProvider.family<List<Treatment>, String?>((ref, categoryId) async {
+final treatmentsProvider = FutureProvider.family<List<Treatment>, String?>((
+  ref,
+  categoryId,
+) async {
   final result = await ref
       .read(_getTreatmentsUseCaseProvider)
       .call(categoryId: categoryId);
@@ -82,8 +85,10 @@ final treatmentsProvider =
   );
 });
 
-final treatmentDetailProvider =
-    FutureProvider.family<Treatment, String>((ref, id) async {
+final treatmentDetailProvider = FutureProvider.family<Treatment, String>((
+  ref,
+  id,
+) async {
   final result = await ref.read(_getTreatmentDetailUseCaseProvider).call(id);
   return result.fold(
     (failure) => throw Exception(failure.message),
@@ -93,8 +98,5 @@ final treatmentDetailProvider =
 
 final addonsProvider = FutureProvider<List<Addon>>((ref) async {
   final result = await ref.read(_getAddonsUseCaseProvider).call();
-  return result.fold(
-    (failure) => <Addon>[],
-    (addons) => addons,
-  );
+  return result.fold((failure) => <Addon>[], (addons) => addons);
 });

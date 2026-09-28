@@ -21,4 +21,3 @@ final class AuthError extends AppAuthState {
   final String message;
   const AuthError(this.message);
 }
-

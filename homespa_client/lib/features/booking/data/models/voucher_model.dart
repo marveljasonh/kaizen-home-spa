@@ -13,8 +13,7 @@ class VoucherModel extends Voucher {
   factory VoucherModel.fromJson(Map<String, dynamic> json) {
     final typeStr = json['discount_type'] as String? ?? 'fixed';
     // DB column is valid_until; fall back to expires_at for backwards compat
-    final expiresRaw =
-        (json['valid_until'] ?? json['expires_at']) as String?;
+    final expiresRaw = (json['valid_until'] ?? json['expires_at']) as String?;
     return VoucherModel(
       code: json['code'] as String,
       discountType: typeStr == 'percentage'
@@ -24,8 +23,8 @@ class VoucherModel extends Voucher {
       // DB column is min_purchase; fall back to min_purchase_amount
       minPurchaseAmount:
           ((json['min_purchase'] ?? json['min_purchase_amount']) as num?)
-                  ?.toDouble() ??
-              0,
+              ?.toDouble() ??
+          0,
       description: json['description'] as String?,
       expiresAt: expiresRaw != null ? DateTime.tryParse(expiresRaw) : null,
     );

@@ -31,7 +31,9 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
     final code = _otpController.text.trim();
     if (code.length != 6) return;
 
-    await ref.read(authNotifierProvider.notifier).verifyPhoneOtp(
+    await ref
+        .read(authNotifierProvider.notifier)
+        .verifyPhoneOtp(
           phone: authState.phone,
           token: code,
           gender: authState.gender,
@@ -43,8 +45,9 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
     if (authState is! AuthAwaitingOtp) return;
     setState(() => _isResending = true);
     try {
-      await Supabase.instance.client.auth
-          .updateUser(UserAttributes(phone: authState.phone));
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(phone: authState.phone),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Code resent successfully')),
@@ -52,9 +55,9 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not resend: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not resend: $e')));
       }
     } finally {
       if (mounted) setState(() => _isResending = false);
@@ -65,8 +68,7 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final isLoading = authState is AuthLoading;
-    final phone =
-        authState is AuthAwaitingOtp ? authState.phone : '';
+    final phone = authState is AuthAwaitingOtp ? authState.phone : '';
 
     ref.listen(authNotifierProvider, (_, next) {
       if (next is AuthError) {
@@ -92,10 +94,13 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: GestureDetector(
-                  onTap: () =>
-                      ref.read(authNotifierProvider.notifier).skipPhoneVerification(),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded,
-                      color: AppColors.textPrimary),
+                  onTap: () => ref
+                      .read(authNotifierProvider.notifier)
+                      .skipPhoneVerification(),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 32),
@@ -106,20 +111,25 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.phone_android_rounded,
-                    size: 36, color: AppColors.primary),
+                child: const Icon(
+                  Icons.phone_android_rounded,
+                  size: 36,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
                 'Verify Your Phone',
-                style: AppTypography.headingMedium
-                    .copyWith(color: AppColors.textPrimary),
+                style: AppTypography.headingMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter the 6-digit code sent to\n$phone',
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary),
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 40),
 
@@ -154,8 +164,10 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 20),
                 ),
@@ -170,18 +182,25 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('Verify',
+                    : const Text(
+                        'Verify',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
               const SizedBox(height: 20),
 
@@ -190,8 +209,9 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                 children: [
                   Text(
                     "Didn't receive the code? ",
-                    style: AppTypography.bodySmall
-                        .copyWith(color: AppColors.textSecondary),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   GestureDetector(
                     onTap: _isResending ? null : _resend,
@@ -213,8 +233,9 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                     .skipPhoneVerification(),
                 child: Text(
                   'Skip for now',
-                  style: AppTypography.labelMedium
-                      .copyWith(color: AppColors.textMuted),
+                  style: AppTypography.labelMedium.copyWith(
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ),
               const SizedBox(height: 32),

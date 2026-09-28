@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@theme {
+  --color-spa-dark: #1C1C1A;
+  --color-spa-darker: #1A1A14;
+  --color-spa-deepest: #141412;
+  --color-spa-olive: #4E523B;
+  --color-spa-olive-light: #5c6148;
+  --color-spa-gold: #C9A96E;
+  --color-spa-gold-light: #d4b483;
+  --color-spa-cream: #FAF7F2;
+
+  --font-display: var(--font-cormorant);
+  --font-sans: var(--font-geist);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #1C1C1A;
+  color: #FAF7F2;
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 35s linear infinite;
+  display: flex;
+  gap: 4rem;
+  white-space: nowrap;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card-hover {
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card-hover:hover {
+  border-color: rgba(201, 169, 110, 0.25);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.gold-text {
+  background: linear-gradient(135deg, #C9A96E 0%, #d4b483 50%, #C9A96E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gold-border {
+  border-color: #C9A96E;
+}
+
+.btn-olive {
+  background-color: #4E523B;
+  color: #FAF7F2;
+  transition: all 0.3s ease;
+}
+
+.btn-olive:hover {
+  background-color: #5c6148;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(78, 82, 59, 0.4);
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #C9A96E 0%, #b8945a 100%);
+  color: #1C1C1A;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(201, 169, 110, 0.4);
+  filter: brightness(1.1);
+}
+
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #C9A96E;
+}
+
+/* Hide scrollbar on branch cards horizontal scroll */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1C1C1A;
+}
+::-webkit-scrollbar-thumb {
+  background: #4E523B;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A96E;
+}

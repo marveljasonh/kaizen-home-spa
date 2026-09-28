@@ -10,7 +10,9 @@ import '../models/treatment_duration_model.dart';
 
 abstract interface class TreatmentsRemoteDataSource {
   Future<List<TreatmentCategory>> getCategories();
-  Future<List<Treatment>> getTreatments({String? categoryId});
+
+  /// [query] matches name or description (case-insensitive substring).
+  Future<List<Treatment>> getTreatments({String? categoryId, String? query});
   Future<Treatment> getTreatmentDetail(String id);
   Future<List<Addon>> getAddons();
 }
@@ -26,28 +28,37 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
   }
 
   @override
-  Future<List<Treatment>> getTreatments({String? categoryId}) async {
+  Future<List<Treatment>> getTreatments({
+    String? categoryId,
+    String? query,
+  }) async {
     final user = _client.auth.currentUser;
     print('[TreatmentsDS] auth user: ${user?.id ?? 'NOT LOGGED IN'}');
 
     try {
       // Step 1: flat treatments query — no embedded joins
-      var query = _client
-          .from('treatments')
-          .select()
-          .eq('is_active', true);
+      var request = _client.from('treatments').select().eq('is_active', true);
 
       if (categoryId != null) {
-        query = query.eq('category_id', categoryId);
+        request = request.eq('category_id', categoryId);
       }
 
-      final treatmentsData = await query.order('name');
+      // Characters that would break PostgREST's or=(…) syntax or act as
+      // wildcards are dropped from the user's text.
+      final term = query?.replaceAll(RegExp(r'[,()%*_\\.]'), ' ').trim();
+      if (term != null && term.isNotEmpty) {
+        request = request.or('name.ilike.%$term%,description.ilike.%$term%');
+      }
+
+      final treatmentsData = await request.order('name');
       print('[TreatmentsDS] treatments rows: ${treatmentsData.length}');
-      if (treatmentsData.isNotEmpty) print('[TreatmentsDS] first row: ${treatmentsData.first}');
+      if (treatmentsData.isNotEmpty)
+        print('[TreatmentsDS] first row: ${treatmentsData.first}');
       if (treatmentsData.isEmpty) return [];
 
-      final treatmentIds =
-          treatmentsData.map((t) => t['id'] as String).toList();
+      final treatmentIds = treatmentsData
+          .map((t) => t['id'] as String)
+          .toList();
 
       // Step 2: fetch categories for name resolution
       final categoryIds = treatmentsData
@@ -85,7 +96,9 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
         );
       }).toList();
     } on PostgrestException catch (e) {
-      print('[TreatmentsDS] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}');
+      print(
+        '[TreatmentsDS] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+      );
       rethrow;
     } catch (e, st) {
       print('[TreatmentsDS] unexpected error: $e\n$st');
@@ -96,11 +109,7 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
   @override
   Future<Treatment> getTreatmentDetail(String id) async {
     // Step 1: fetch the treatment row
-    final row = await _client
-        .from('treatments')
-        .select()
-        .eq('id', id)
-        .single();
+    final row = await _client.from('treatments').select().eq('id', id).single();
 
     // Step 2: fetch category name
     final categoryData = await _client
@@ -134,7 +143,9 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
       print('[AddonsDS] rows: ${data.length}');
       return data.map((e) => AddonModel.fromJson(e)).toList();
     } on PostgrestException catch (e) {
-      print('[AddonsDS] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}');
+      print(
+        '[AddonsDS] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+      );
       rethrow;
     } catch (e, st) {
       print('[AddonsDS] unexpected error: $e\n$st');

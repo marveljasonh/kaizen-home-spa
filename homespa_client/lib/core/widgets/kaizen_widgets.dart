@@ -51,8 +51,11 @@ class KaizenPrimaryButton extends StatelessWidget {
               ),
               if (showArrow) ...[
                 const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded,
-                    color: Colors.white, size: 18),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ],
             ],
           ],
@@ -112,8 +115,9 @@ class KaizenSectionHeader extends StatelessWidget {
         Expanded(
           child: Text(
             overlineTitle,
-            style: AppTypography.headingSmall
-                .copyWith(color: AppColors.textPrimary),
+            style: AppTypography.headingSmall.copyWith(
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
         if (actionLabel != null && onAction != null)
@@ -124,12 +128,16 @@ class KaizenSectionHeader extends StatelessWidget {
               children: [
                 Text(
                   actionLabel!,
-                  style: AppTypography.labelMedium
-                      .copyWith(color: AppColors.primary),
+                  style: AppTypography.labelMedium.copyWith(
+                    color: AppColors.primary,
+                  ),
                 ),
                 const SizedBox(width: 2),
-                const Icon(Icons.arrow_forward_rounded,
-                    size: 14, color: AppColors.primary),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
               ],
             ),
           ),
@@ -144,11 +152,7 @@ class KaizenFeatureTile extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const KaizenFeatureTile({
-    super.key,
-    required this.icon,
-    required this.label,
-  });
+  const KaizenFeatureTile({super.key, required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -168,8 +172,9 @@ class KaizenFeatureTile extends StatelessWidget {
         Text(
           label,
           textAlign: TextAlign.center,
-          style: AppTypography.labelSmall
-              .copyWith(color: AppColors.textSecondary),
+          style: AppTypography.labelSmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -210,17 +215,21 @@ class KaizenPromoBanner extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.gold.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: AppColors.gold.withValues(alpha: 0.5)),
+                        color: AppColors.gold.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Text(
                       'LIMITED OFFER',
-                      style: AppTypography.overline
-                          .copyWith(color: AppColors.gold),
+                      style: AppTypography.overline.copyWith(
+                        color: AppColors.gold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -249,8 +258,11 @@ class KaizenPromoBanner extends StatelessWidget {
                 color: AppColors.gold,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_forward_rounded,
-                  color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ],
         ),
@@ -307,14 +319,16 @@ class KaizenBookingField extends StatelessWidget {
                 children: [
                   Text(
                     label.toUpperCase(),
-                    style: AppTypography.overline
-                        .copyWith(color: AppColors.textMuted),
+                    style: AppTypography.overline.copyWith(
+                      color: AppColors.textMuted,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     value,
-                    style: AppTypography.bodySmall
-                        .copyWith(color: AppColors.textPrimary),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -322,8 +336,11 @@ class KaizenBookingField extends StatelessWidget {
               ),
             ),
             if (hasDropdown)
-              const Icon(Icons.expand_more_rounded,
-                  color: AppColors.textMuted, size: 18),
+              const Icon(
+                Icons.expand_more_rounded,
+                color: AppColors.textMuted,
+                size: 18,
+              ),
           ],
         ),
       ),

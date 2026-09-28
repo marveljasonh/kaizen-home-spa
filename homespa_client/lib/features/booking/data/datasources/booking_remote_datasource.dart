@@ -35,23 +35,21 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
 
       if (preferred.isEmpty) return [];
 
-      final ids = preferred
-          .map((r) => r['therapist_id'] as String)
-          .toList();
+      final ids = preferred.map((r) => r['therapist_id'] as String).toList();
 
       // Step 2: name + avatar from profiles (keyed by id)
       final profileRows = await _client
           .from('profiles')
           .select('id, full_name, avatar_url')
           .inFilter('id', ids);
-      final profileMap = {
-        for (final r in profileRows) r['id'] as String: r,
-      };
+      final profileMap = {for (final r in profileRows) r['id'] as String: r};
 
       // Step 3: rating + bio + specialties from therapist_profiles (keyed by profile_id)
       final tProfileRows = await _client
           .from('therapist_profiles')
-          .select('profile_id, rating_avg, bio, specialties, status, is_available')
+          .select(
+            'profile_id, rating_avg, bio, specialties, status, is_available',
+          )
           .inFilter('profile_id', ids);
       final tProfileMap = {
         for (final r in tProfileRows) r['profile_id'] as String: r,
@@ -105,7 +103,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
 
     debugPrint('[FreeReward] freeRewardId: $freeRewardId');
     debugPrint('[FreeReward] freeRewardTreatmentId: $freeRewardTreatmentId');
-    debugPrint('[FreeReward] request.paymentMethodId: ${request.paymentMethodId}');
+    debugPrint(
+      '[FreeReward] request.paymentMethodId: ${request.paymentMethodId}',
+    );
     debugPrint('[FreeReward] request.total: ${request.total}');
     debugPrint('[FreeReward] request.items.length: ${request.items.length}');
 
@@ -131,7 +131,8 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         .limit(1)
         .single();
 
-    final isFreeReward = request.total == 0 && request.paymentMethodId == 'reward';
+    final isFreeReward =
+        request.total == 0 && request.paymentMethodId == 'reward';
 
     final bookingData = {
       'client_id': userId,
@@ -166,18 +167,22 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     if (request.items.isNotEmpty) {
       debugPrint('[CreateBooking] first item: ${request.items.first}');
 
-      final itemsToInsert = request.items.map((item) => {
-        'booking_id': booking['id'],
-        'treatment_duration_id': item.treatmentDurationId,
-        'treatment_snapshot': {
-          'treatment_name': item.treatmentName,
-          'duration_minutes': item.durationMinutes,
-          'price': item.unitPrice,
-        },
-        'quantity': item.quantity,
-        'unit_price': item.unitPrice,
-        'subtotal': item.unitPrice * item.quantity,
-      }).toList();
+      final itemsToInsert = request.items
+          .map(
+            (item) => {
+              'booking_id': booking['id'],
+              'treatment_duration_id': item.treatmentDurationId,
+              'treatment_snapshot': {
+                'treatment_name': item.treatmentName,
+                'duration_minutes': item.durationMinutes,
+                'price': item.unitPrice,
+              },
+              'quantity': item.quantity,
+              'unit_price': item.unitPrice,
+              'subtotal': item.unitPrice * item.quantity,
+            },
+          )
+          .toList();
 
       debugPrint('[CreateBooking] items to insert: $itemsToInsert');
 
@@ -188,24 +193,30 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         debugPrint('[CreateBooking] booking_items insert ERROR: $e');
       }
     } else {
-      debugPrint('[CreateBooking] WARNING: no items in request, skipping booking_items insert');
+      debugPrint(
+        '[CreateBooking] WARNING: no items in request, skipping booking_items insert',
+      );
     }
 
     // Insert booking_addons
     debugPrint('[CreateBooking] cart addons count: ${request.addons.length}');
 
     if (request.addons.isNotEmpty) {
-      final addonsToInsert = request.addons.map((addon) => {
-        'booking_id': booking['id'],
-        'addon_id': addon.addonId,
-        'addon_snapshot': {
-          'addon_name': addon.addonName,
-          'price': addon.unitPrice,
-        },
-        'quantity': addon.quantity,
-        'unit_price': addon.unitPrice,
-        'subtotal': addon.unitPrice * addon.quantity,
-      }).toList();
+      final addonsToInsert = request.addons
+          .map(
+            (addon) => {
+              'booking_id': booking['id'],
+              'addon_id': addon.addonId,
+              'addon_snapshot': {
+                'addon_name': addon.addonName,
+                'price': addon.unitPrice,
+              },
+              'quantity': addon.quantity,
+              'unit_price': addon.unitPrice,
+              'subtotal': addon.unitPrice * addon.quantity,
+            },
+          )
+          .toList();
 
       debugPrint('[CreateBooking] addons to insert: $addonsToInsert');
 
@@ -218,9 +229,13 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     }
 
     // Handle free reward: insert free treatment as a booking_item and mark redemption used
-    debugPrint('[FreeReward] reached free reward block — freeRewardId: $freeRewardId');
+    debugPrint(
+      '[FreeReward] reached free reward block — freeRewardId: $freeRewardId',
+    );
     if (freeRewardId != null) {
-      debugPrint('[FreeReward] freeRewardId is NOT null — proceeding with insert');
+      debugPrint(
+        '[FreeReward] freeRewardId is NOT null — proceeding with insert',
+      );
 
       // Look up the real treatment name from Supabase
       String treatmentName = 'Free Treatment';
@@ -237,12 +252,16 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
           debugPrint('[FreeReward] treatment name lookup ERROR: $e');
         }
       } else {
-        debugPrint('[FreeReward] freeRewardTreatmentId is null — using fallback name');
+        debugPrint(
+          '[FreeReward] freeRewardTreatmentId is null — using fallback name',
+        );
       }
 
       // Insert free treatment as a booking_item with price 0
       final freeDurationMinutes = request.freeRewardDurationMinutes ?? 0;
-      debugPrint('[FreeReward] inserting booking_item for: $treatmentName ($freeDurationMinutes min)');
+      debugPrint(
+        '[FreeReward] inserting booking_item for: $treatmentName ($freeDurationMinutes min)',
+      );
       try {
         final insertResult = await _client.from('booking_items').insert({
           'booking_id': booking['id'],
@@ -275,7 +294,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         debugPrint('[FreeReward] reward_redemption update ERROR: $e');
       }
     } else {
-      debugPrint('[FreeReward] freeRewardId IS null — skipping free item insert');
+      debugPrint(
+        '[FreeReward] freeRewardId IS null — skipping free item insert',
+      );
     }
 
     // Mark discount reward redemption as used after booking is confirmed.
@@ -288,7 +309,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
               'used_at': DateTime.now().toUtc().toIso8601String(),
             })
             .eq('id', discountRedemptionId);
-        debugPrint('[DiscountReward] redemption $discountRedemptionId marked used');
+        debugPrint(
+          '[DiscountReward] redemption $discountRedemptionId marked used',
+        );
       } catch (e) {
         debugPrint('[DiscountReward] redemption update ERROR: $e');
       }

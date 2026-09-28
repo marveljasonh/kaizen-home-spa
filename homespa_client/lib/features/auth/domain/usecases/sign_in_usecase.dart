@@ -11,6 +11,5 @@ class SignInUseCase {
   Future<Either<Failure, AppUser>> call({
     required String email,
     required String password,
-  }) =>
-      _repository.signInWithEmail(email: email, password: password);
+  }) => _repository.signInWithEmail(email: email, password: password);
 }

@@ -39,12 +39,12 @@ class BookingRecord extends Equatable {
       status == BookingStatus.inProgress;
 
   String get statusLabel => switch (status) {
-        BookingStatus.pending => 'Pending',
-        BookingStatus.confirmed => 'Confirmed',
-        BookingStatus.inProgress => 'In Progress',
-        BookingStatus.completed => 'Completed',
-        BookingStatus.cancelled => 'Cancelled',
-      };
+    BookingStatus.pending => 'Pending',
+    BookingStatus.confirmed => 'Confirmed',
+    BookingStatus.inProgress => 'In Progress',
+    BookingStatus.completed => 'Completed',
+    BookingStatus.cancelled => 'Cancelled',
+  };
 
   String get displayTotal => formatRupiah(total);
 

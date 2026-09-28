@@ -27,6 +27,10 @@ class Voucher extends Equatable {
       : '${formatRupiah(discountValue)} off';
 
   @override
-  List<Object?> get props =>
-      [code, discountType, discountValue, minPurchaseAmount];
+  List<Object?> get props => [
+    code,
+    discountType,
+    discountValue,
+    minPurchaseAmount,
+  ];
 }

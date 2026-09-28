@@ -19,7 +19,9 @@ class PromoRemoteDataSourceImpl implements PromoRemoteDataSource {
     try {
       final data = await _client
           .from('banners')
-          .select('id, title, subtitle, image_url, is_active, valid_from, valid_until')
+          .select(
+            'id, title, subtitle, image_url, is_active, valid_from, valid_until',
+          )
           .eq('is_active', true)
           .order('valid_from', ascending: false);
       return data.map((e) => PromoBannerModel.fromJson(e)).toList();
@@ -36,7 +38,9 @@ class PromoRemoteDataSourceImpl implements PromoRemoteDataSource {
 
       final data = await _client
           .from('vouchers')
-          .select('id, code, description, discount_type, discount_value, min_purchase, valid_until, is_active, max_uses_per_user')
+          .select(
+            'id, code, description, discount_type, discount_value, min_purchase, valid_until, is_active, max_uses_per_user',
+          )
           .eq('is_active', true)
           .gte('valid_until', now)
           .order('valid_until', ascending: true);

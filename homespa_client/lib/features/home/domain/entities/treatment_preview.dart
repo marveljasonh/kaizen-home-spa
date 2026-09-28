@@ -23,13 +23,13 @@ class TreatmentPreview extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        name,
-        category,
-        durationMinutes,
-        price,
-        rating,
-        reviewCount,
-        imageUrl,
-      ];
+    id,
+    name,
+    category,
+    durationMinutes,
+    price,
+    rating,
+    reviewCount,
+    imageUrl,
+  ];
 }

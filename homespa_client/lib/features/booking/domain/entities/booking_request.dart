@@ -81,19 +81,19 @@ class BookingRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'treatment_id': treatmentId,
-        'treatment_duration_id': treatmentDurationId,
-        'therapist_id': therapistId,
-        'scheduled_at': scheduledAt.toUtc().toIso8601String(),
-        'address_text': addressText,
-        'latitude': latitude,
-        'longitude': longitude,
-        'address_notes': addressNotes,
-        'voucher_code': voucherCode,
-        'payment_method': paymentMethodId,
-        'subtotal': subtotal,
-        'discount': discountAmount,
-        'total': total,
-        'status': 'pending',
-      };
+    'treatment_id': treatmentId,
+    'treatment_duration_id': treatmentDurationId,
+    'therapist_id': therapistId,
+    'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+    'address_text': addressText,
+    'latitude': latitude,
+    'longitude': longitude,
+    'address_notes': addressNotes,
+    'voucher_code': voucherCode,
+    'payment_method': paymentMethodId,
+    'subtotal': subtotal,
+    'discount': discountAmount,
+    'total': total,
+    'status': 'pending',
+  };
 }

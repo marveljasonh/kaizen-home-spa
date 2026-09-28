@@ -30,7 +30,8 @@ class NotificationService {
     // Foreground messages
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint(
-          'FCM foreground: ${message.notification?.title} — ${message.notification?.body}');
+        'FCM foreground: ${message.notification?.title} — ${message.notification?.body}',
+      );
     });
   }
 
@@ -41,7 +42,8 @@ class NotificationService {
     try {
       await Supabase.instance.client
           .from('profiles')
-          .update({'fcm_token': token}).eq('id', userId);
+          .update({'fcm_token': token})
+          .eq('id', userId);
       debugPrint('FCM token saved for $userId');
     } catch (e) {
       debugPrint('FCM token save failed: $e');

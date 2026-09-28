@@ -11,10 +11,8 @@ import '../../data/repositories/booking_repository_impl.dart';
 import '../../domain/entities/booking_detail_data.dart';
 import '../../domain/entities/booking_record.dart';
 import '../../domain/entities/therapist.dart';
-import '../../domain/entities/time_slot.dart';
 import '../../domain/repositories/booking_repository.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
-import '../../domain/usecases/get_available_slots_usecase.dart';
 import '../../domain/usecases/get_booking_history_usecase.dart';
 import '../../domain/usecases/get_therapists_usecase.dart';
 import '../../domain/usecases/validate_voucher_usecase.dart';
@@ -41,20 +39,39 @@ final createBookingUseCaseProvider = Provider<CreateBookingUseCase>(
   (ref) => CreateBookingUseCase(ref.watch(bookingRepositoryProvider)),
 );
 
-final getAvailableSlotsUseCaseProvider = Provider<GetAvailableSlotsUseCase>(
-  (_) => const GetAvailableSlotsUseCase(),
-);
-
 // ── Async data providers ──────────────────────────────────────────────────────
 
-final therapistsProvider = FutureProvider.autoDispose<List<Therapist>>((ref) async {
+final therapistsProvider = FutureProvider.autoDispose<List<Therapist>>((
+  ref,
+) async {
   final client = Supabase.instance.client;
+  final userId = client.auth.currentUser?.id;
+  if (userId == null) return [];
 
-  // Fetch ALL therapists from therapist_profiles, available ones first
+  // Only therapists who have already treated this client: distinct
+  // therapist_id from their completed bookings. New clients get none and
+  // can only pick "Any Available Therapist".
+  final bookingRows = await client
+      .from('bookings')
+      .select('therapist_id')
+      .eq('client_id', userId)
+      .eq('status', 'completed')
+      .not('therapist_id', 'is', null);
+  final treatedIds = {
+    for (final r in bookingRows as List<dynamic>)
+      if ((r as Map<String, dynamic>)['therapist_id'] != null)
+        r['therapist_id'] as String,
+  }.toList();
+  if (treatedIds.isEmpty) return [];
+
+  // Those therapists from therapist_profiles, available ones first
   final tProfileRows = List<Map<String, dynamic>>.from(
     await client
         .from('therapist_profiles')
-        .select('profile_id, rating_avg, bio, specialties, status, is_available')
+        .select(
+          'profile_id, rating_avg, bio, specialties, status, is_available',
+        )
+        .inFilter('profile_id', treatedIds)
         .order('is_available', ascending: false),
   );
 
@@ -91,62 +108,97 @@ final therapistsProvider = FutureProvider.autoDispose<List<Therapist>>((ref) asy
   }).toList();
 });
 
-final availableSlotsProvider =
-    Provider.family<List<TimeSlot>, DateTime>((ref, date) {
-  return ref.read(getAvailableSlotsUseCaseProvider).call(date);
-});
+/// A therapist's existing booking, as a UTC time range.
+class BusyWindow {
+  final DateTime startUtc;
+  final int durationMinutes;
+  const BusyWindow(this.startUtc, this.durationMinutes);
 
-/// Booked time keys ('HH:MM') for a specific therapist today.
-/// Returns ALL bookings as zero-padded strings matching TimeSlot.id format.
-final bookedHoursForTherapistProvider = FutureProvider.autoDispose
-    .family<Set<String>, String?>((ref, therapistId) async {
-  if (therapistId == null) return {};
-  final client = Supabase.instance.client;
-  final rows = List<Map<String, dynamic>>.from(
-    await client
-        .from('bookings')
-        .select('scheduled_at')
-        .eq('therapist_id', therapistId)
-        .not('status', 'in', '("completed","cancelled")')
-        .gte('scheduled_at', WIB.startOfTodayUtc().toIso8601String())
-        .lt('scheduled_at', WIB.endOfTodayUtc().toIso8601String()),
-  );
-  final bookedSlots = <String>[];
-  for (final r in rows) {
-    final scheduledAt = r['scheduled_at'] as String?;
-    if (scheduledAt != null) {
-      final wib = WIB.toWIB(DateTime.parse(scheduledAt));
-      final timeKey =
-          '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
-      debugPrint('Booked slot UTC→WIB: ${WIB.formatTime(DateTime.parse(scheduledAt))} → key $timeKey');
-      bookedSlots.add(timeKey);
-    }
-  }
-  debugPrint('Booked slots for therapist $therapistId: $bookedSlots');
-  return bookedSlots.toSet();
-});
+  DateTime get endUtc => startUtc.add(Duration(minutes: durationMinutes));
+}
+
+/// Used when a booking's items carry no duration.
+const int kDefaultBookingMinutes = 60;
+
+/// Active bookings for [therapistId] around the WIB calendar day [dayWib].
+/// The query reaches 12 h either side of the day so bookings that cross
+/// midnight still count.
+final therapistBusyWindowsProvider = FutureProvider.autoDispose
+    .family<List<BusyWindow>, ({String therapistId, DateTime dayWib})>((
+      ref,
+      args,
+    ) async {
+      final client = Supabase.instance.client;
+      final dayStart = WIB.startOfDayUtc(args.dayWib);
+      final rows = List<Map<String, dynamic>>.from(
+        await client
+            .from('bookings')
+            .select('id, scheduled_at')
+            .eq('therapist_id', args.therapistId)
+            .not('status', 'in', '("completed","cancelled")')
+            .gte(
+              'scheduled_at',
+              dayStart.subtract(const Duration(hours: 12)).toIso8601String(),
+            )
+            .lt(
+              'scheduled_at',
+              dayStart.add(const Duration(hours: 36)).toIso8601String(),
+            ),
+      );
+      if (rows.isEmpty) return const [];
+
+      final ids = rows.map((r) => r['id'] as String).toList();
+      final itemRows = List<Map<String, dynamic>>.from(
+        await client
+            .from('booking_items')
+            .select('booking_id, treatment_snapshot, quantity')
+            .inFilter('booking_id', ids),
+      );
+      final minutesById = <String, int>{};
+      for (final item in itemRows) {
+        final snap = item['treatment_snapshot'] as Map<String, dynamic>? ?? {};
+        final mins = (snap['duration_minutes'] as num?)?.toInt() ?? 0;
+        final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+        final id = item['booking_id'] as String;
+        minutesById[id] = (minutesById[id] ?? 0) + mins * qty;
+      }
+
+      final windows = [
+        for (final r in rows)
+          BusyWindow(
+            DateTime.parse(r['scheduled_at'] as String).toUtc(),
+            (minutesById[r['id']] ?? 0) > 0
+                ? minutesById[r['id']]!
+                : kDefaultBookingMinutes,
+          ),
+      ];
+      debugPrint(
+        'Busy windows for ${args.therapistId} on '
+        '${WIB.formatDate(dayStart)}: '
+        '${windows.map((w) => '${WIB.formatTime(w.startUtc)}–${WIB.formatTime(w.endUtc)}').join(', ')}',
+      );
+      return windows;
+    });
 
 /// Therapist IDs that have an active booking within ±2 hours of [scheduledAt].
 final bookedTherapistIdsProvider = FutureProvider.autoDispose
     .family<Set<String>, DateTime?>((ref, scheduledAt) async {
-  if (scheduledAt == null) return {};
-  final client = Supabase.instance.client;
-  const window = Duration(hours: 2);
-  final rows = List<Map<String, dynamic>>.from(
-    await client
-        .from('bookings')
-        .select('therapist_id')
-        .not('status', 'in', '("completed","cancelled")')
-        .gte('scheduled_at',
-            scheduledAt.subtract(window).toIso8601String())
-        .lte('scheduled_at',
-            scheduledAt.add(window).toIso8601String()),
-  );
-  return {
-    for (final r in rows)
-      if (r['therapist_id'] != null) r['therapist_id'] as String,
-  };
-});
+      if (scheduledAt == null) return {};
+      final client = Supabase.instance.client;
+      const window = Duration(hours: 2);
+      final rows = List<Map<String, dynamic>>.from(
+        await client
+            .from('bookings')
+            .select('therapist_id')
+            .not('status', 'in', '("completed","cancelled")')
+            .gte('scheduled_at', scheduledAt.subtract(window).toIso8601String())
+            .lte('scheduled_at', scheduledAt.add(window).toIso8601String()),
+      );
+      return {
+        for (final r in rows)
+          if (r['therapist_id'] != null) r['therapist_id'] as String,
+      };
+    });
 
 final getBookingHistoryUseCaseProvider = Provider<GetBookingHistoryUseCase>(
   (ref) => GetBookingHistoryUseCase(ref.watch(bookingRepositoryProvider)),
@@ -167,22 +219,22 @@ final bookingHistoryProvider = FutureProvider<List<BookingRecord>>((ref) async {
 /// Automatically updates when admin changes booking status.
 final bookingHistoryStreamProvider = StreamProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, userId) {
-  return Supabase.instance.client
-      .from('bookings')
-      .stream(primaryKey: ['id'])
-      .eq('client_id', userId)
-      .order('scheduled_at', ascending: false);
-});
+      return Supabase.instance.client
+          .from('bookings')
+          .stream(primaryKey: ['id'])
+          .eq('client_id', userId)
+          .order('scheduled_at', ascending: false);
+    });
 
 /// Subscribes to a single booking row for realtime status updates.
 final bookingDetailStreamProvider = StreamProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, bookingId) {
-  return Supabase.instance.client
-      .from('bookings')
-      .stream(primaryKey: ['id'])
-      .eq('id', bookingId)
-      .map((list) => list.isNotEmpty ? list.first : null);
-});
+      return Supabase.instance.client
+          .from('bookings')
+          .stream(primaryKey: ['id'])
+          .eq('id', bookingId)
+          .map((list) => list.isNotEmpty ? list.first : null);
+    });
 
 // ── Booking detail state (issues 1, 2, 3, 6) ────────────────────────────────
 
@@ -204,13 +256,12 @@ class BookingDetailState {
     String? error,
     BookingDetailData? detail,
     bool? isSubmittingReview,
-  }) =>
-      BookingDetailState(
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-        detail: detail ?? this.detail,
-        isSubmittingReview: isSubmittingReview ?? this.isSubmittingReview,
-      );
+  }) => BookingDetailState(
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+    detail: detail ?? this.detail,
+    isSubmittingReview: isSubmittingReview ?? this.isSubmittingReview,
+  );
 }
 
 class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
@@ -219,7 +270,7 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
   Timer? _pollingTimer;
 
   BookingDetailNotifier(this._client, this._bookingId)
-      : super(const BookingDetailState()) {
+    : super(const BookingDetailState()) {
     _init();
   }
 
@@ -254,10 +305,14 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
           .maybeSingle();
       debugPrint('[BookingDetail] Step 1: booking found=${row != null}');
       if (row == null) {
-        debugPrint('[BookingDetail] Step 1: booking NOT found — id=$_bookingId');
+        debugPrint(
+          '[BookingDetail] Step 1: booking NOT found — id=$_bookingId',
+        );
         if (!mounted) return;
         state = BookingDetailState(
-            isLoading: false, error: 'Booking not found (id: $_bookingId)');
+          isLoading: false,
+          error: 'Booking not found (id: $_bookingId)',
+        );
         return;
       }
       debugPrint('[BookingDetail] Step 1 data: $row');
@@ -272,7 +327,9 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
             .select('*')
             .eq('booking_id', _bookingId);
         itemRows = List<Map<String, dynamic>>.from(result);
-        debugPrint('[BookingDetail] Step 2: ${itemRows.length} items — $itemRows');
+        debugPrint(
+          '[BookingDetail] Step 2: ${itemRows.length} items — $itemRows',
+        );
       } catch (e, st) {
         debugPrint('[BookingDetail] Step 2 ERROR: $e\n$st');
       }
@@ -298,7 +355,9 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
             .select('*')
             .eq('booking_id', _bookingId);
         addonRows = List<Map<String, dynamic>>.from(result);
-        debugPrint('[BookingDetail] Step 4: ${addonRows.length} addons — $addonRows');
+        debugPrint(
+          '[BookingDetail] Step 4: ${addonRows.length} addons — $addonRows',
+        );
       } catch (e, st) {
         debugPrint('[BookingDetail] Step 4 ERROR: $e\n$st');
       }
@@ -351,8 +410,7 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
               .maybeSingle();
           debugPrint('[BookingDetail] Step 6b therapist_profiles: $detailRow');
           if (detailRow != null) {
-            therapistRating =
-                (detailRow['rating_avg'] as num?)?.toDouble();
+            therapistRating = (detailRow['rating_avg'] as num?)?.toDouble();
           }
         } catch (e, st) {
           debugPrint('[BookingDetail] Step 6b ERROR: $e\n$st');
@@ -377,14 +435,18 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
             existingRating = (reviewRow['rating'] as num?)?.toDouble();
             existingReviewText = reviewRow['review_text'] as String?;
           }
-          debugPrint('[BookingDetail] Step 7: hasReview=$hasReview rating=$existingRating');
+          debugPrint(
+            '[BookingDetail] Step 7: hasReview=$hasReview rating=$existingRating',
+          );
         } catch (e, st) {
           debugPrint('[BookingDetail] Step 7 ERROR: $e\n$st');
         }
       }
 
       // Step 8: parse scheduledAt
-      debugPrint('[BookingDetail] Step 8: parsing scheduled_at=${row['scheduled_at']}');
+      debugPrint(
+        '[BookingDetail] Step 8: parsing scheduled_at=${row['scheduled_at']}',
+      );
       final scheduledAt = DateTime.parse(row['scheduled_at'] as String);
 
       debugPrint('[BookingDetail] All steps done — building state');
@@ -453,12 +515,16 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
           .eq('therapist_id', detail.therapistId!);
 
       if (allRatings.isNotEmpty) {
-        final avg = allRatings.fold<double>(
-                0.0, (sum, r) => sum + (r['rating'] as num).toDouble()) /
+        final avg =
+            allRatings.fold<double>(
+              0.0,
+              (sum, r) => sum + (r['rating'] as num).toDouble(),
+            ) /
             allRatings.length;
         await _client
             .from('therapist_profiles')
-            .update({'rating_avg': avg}).eq('id', detail.therapistId!);
+            .update({'rating_avg': avg})
+            .eq('id', detail.therapistId!);
       }
 
       if (!mounted) return;
@@ -467,8 +533,9 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
         detail: detail.copyWith(
           hasExistingReview: true,
           existingRating: rating,
-          existingReviewText:
-              reviewText != null && reviewText.trim().isNotEmpty ? reviewText.trim() : null,
+          existingReviewText: reviewText != null && reviewText.trim().isNotEmpty
+              ? reviewText.trim()
+              : null,
         ),
       );
     } catch (e) {
@@ -486,17 +553,21 @@ class BookingDetailNotifier extends StateNotifier<BookingDetailState> {
   }
 
   static BookingStatus _parseStatus(String s) => switch (s) {
-        'confirmed' => BookingStatus.confirmed,
-        'therapist_assigned' => BookingStatus.confirmed,
-        'in_progress' => BookingStatus.inProgress,
-        'completed' => BookingStatus.completed,
-        'cancelled' => BookingStatus.cancelled,
-        _ => BookingStatus.pending,
-      };
+    'confirmed' => BookingStatus.confirmed,
+    'therapist_assigned' => BookingStatus.confirmed,
+    'in_progress' => BookingStatus.inProgress,
+    'completed' => BookingStatus.completed,
+    'cancelled' => BookingStatus.cancelled,
+    _ => BookingStatus.pending,
+  };
 }
 
-final bookingDetailProvider = StateNotifierProvider.family<BookingDetailNotifier,
-    BookingDetailState, String>(
-  (ref, bookingId) =>
-      BookingDetailNotifier(Supabase.instance.client, bookingId),
-);
+final bookingDetailProvider =
+    StateNotifierProvider.family<
+      BookingDetailNotifier,
+      BookingDetailState,
+      String
+    >(
+      (ref, bookingId) =>
+          BookingDetailNotifier(Supabase.instance.client, bookingId),
+    );

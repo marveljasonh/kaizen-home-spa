@@ -31,7 +31,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(authNotifierProvider.notifier).signIn(
+    await ref
+        .read(authNotifierProvider.notifier)
+        .signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -114,8 +116,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         onPressed: () {},
                         child: Text(
                           'Forgot password?',
-                          style: AppTypography.labelMedium
-                              .copyWith(color: AppColors.primary),
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
@@ -131,8 +134,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       children: [
                         Text(
                           "Don't have an account? ",
-                          style: AppTypography.bodySmall
-                              .copyWith(color: AppColors.textSecondary),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         GestureDetector(
                           onTap: () => context.go('/auth/signup'),
@@ -179,14 +183,14 @@ class _BrandHeader extends StatelessWidget {
         const SizedBox(height: 20),
         Text(
           'Kaizen Home Spa',
-          style: AppTypography.headingMedium
-              .copyWith(color: AppColors.textPrimary),
+          style: AppTypography.headingMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'Your wellness journey starts here',
-          style: AppTypography.bodySmall
-              .copyWith(color: AppColors.textMuted),
+          style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
         ),
       ],
     );

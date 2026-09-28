@@ -1,14 +1,35 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/treatment.dart';
 import '../../domain/entities/treatment_duration.dart';
 import '../providers/treatments_providers.dart';
-import '../widgets/duration_selector.dart';
+import '../widgets/glass_icon_button.dart';
+
+// ── Assets exported from Figma (kaizen › fullbodya, node 1626:4620) ───────────
+const String _kHeroFallback = 'assets/images/treatments/detail_hero.png';
+const String _kIconBack = 'assets/icons/chevron_left_33.svg';
+
+// ── Figma values (402pt-wide frame) ──────────────────────────────────────────
+const double _kSide = 29;
+// Figma's content right edge is x 378 (cards and button), i.e. 24 from the
+// right, while text starts 29 from the left.
+const double _kSideRight = 24;
+const double _kHeroMinHeight = 379;
+const Color _kBg = Color(0xFF4E523B);
+const Color _kBar = Color(0xFF313129);
+
+/// Figma's "normal" line height for Montserrat (ascent + descent). Flutter's
+/// default adds the font's line gap (~1.41), which drifts vertical spacing.
+const double _kFigmaNormal = 1.219;
 
 class TreatmentDetailPage extends ConsumerWidget {
   final String treatmentId;
@@ -18,286 +39,360 @@ class TreatmentDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final treatmentAsync = ref.watch(treatmentDetailProvider(treatmentId));
 
-    return treatmentAsync.when(
-      loading: () => const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline_rounded,
-                  size: 48, color: AppColors.textSecondary),
-              const SizedBox(height: 12),
-              Text('Could not load treatment',
-                  style: TextStyle(color: AppColors.textSecondary)),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () =>
-                    ref.invalidate(treatmentDetailProvider(treatmentId)),
-                child: const Text('Retry'),
-              ),
-            ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: _kBg,
+        body: treatmentAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.cream),
           ),
+          error: (e, _) => _ErrorState(
+            onRetry: () => ref.invalidate(treatmentDetailProvider(treatmentId)),
+          ),
+          data: (treatment) => _DetailBody(treatment: treatment),
         ),
       ),
-      data: (treatment) => _TreatmentDetailScaffold(treatment: treatment),
     );
   }
 }
 
-// ── Main scaffold ──────────────────────────────────────────────────────────
+// ── Body ─────────────────────────────────────────────────────────────────────
 
-class _TreatmentDetailScaffold extends ConsumerWidget {
+class _DetailBody extends ConsumerWidget {
   final Treatment treatment;
-  const _TreatmentDetailScaffold({required this.treatment});
+  const _DetailBody({required this.treatment});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedId = ref.watch(selectedDurationIdProvider(treatment.id));
     final resolved = _resolveSelected(treatment, selectedId);
+    final durations = [...treatment.durations]
+      ..sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          _HeroAppBar(treatment: treatment),
-          SliverToBoxAdapter(
-            child: _DetailContent(
-              treatment: treatment,
-              selectedId: selectedId,
-              resolved: resolved,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _BookingBar(
-        price: resolved?.price ?? treatment.displayPrice,
-        durationMinutes:
-            resolved?.durationMinutes ?? treatment.displayDurationMinutes,
-        onBook: () {
-          context
-              .push(
-                '/treatments/${treatment.id}/addons',
-                extra: {
-                  'treatment': treatment,
-                  'duration': resolved,
-                },
-              )
-              .then((_) {
-            // Addon page has been dismissed (Skip or Add to Cart).
-            // Pop treatment detail so the user lands on the treatments list
-            // where the snackbar (shown from the addon page) is visible.
+    void onAddToCart() {
+      context
+          .push(
+            '/treatments/${treatment.id}/addons',
+            extra: {'treatment': treatment, 'duration': resolved},
+          )
+          .then((_) {
+            // Addon page dismissed (Skip or Add to Cart): return to the list,
+            // where the snackbar shown from the addon page is visible.
             if (context.mounted) context.pop();
           });
-        },
-      ),
-    );
-  }
-}
+    }
 
-// ── Hero app bar ───────────────────────────────────────────────────────────
-
-class _HeroAppBar extends StatelessWidget {
-  final Treatment treatment;
-  const _HeroAppBar({required this.treatment});
-
-  @override
-  Widget build(BuildContext context) {
-    const color = AppColors.secondary;
-    return SliverAppBar(
-      expandedHeight: 260,
-      pinned: true,
-      backgroundColor: AppColors.secondary,
-      iconTheme: const IconThemeData(color: Colors.white),
-      flexibleSpace: FlexibleSpaceBar(
-        background: (treatment.imageUrl != null && treatment.imageUrl!.isNotEmpty)
-            ? CachedNetworkImage(
-                imageUrl: treatment.imageUrl!,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => _HeroPlaceholder(
-                  color: color,
-                  categoryName: treatment.categoryName,
-                ),
-                errorWidget: (context, url, error) => _HeroPlaceholder(
-                  color: color,
-                  categoryName: treatment.categoryName,
-                ),
-              )
-            : _HeroPlaceholder(
-                color: color,
-                categoryName: treatment.categoryName,
-              ),
-        title: Text(
-          treatment.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
-        ),
-        titlePadding: const EdgeInsets.only(left: 56, bottom: 16, right: 16),
-      ),
-    );
-  }
-}
-
-// ── Detail content ─────────────────────────────────────────────────────────
-
-class _DetailContent extends ConsumerWidget {
-  final Treatment treatment;
-  final String? selectedId;
-  final TreatmentDuration? resolved;
-
-  const _DetailContent({
-    required this.treatment,
-    required this.selectedId,
-    required this.resolved,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final text = Theme.of(context).textTheme;
-    final color = _categoryColor(treatment.categoryName);
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Category row
-          _Badge(label: treatment.categoryName, color: color),
-          const SizedBox(height: 20),
-
-          // Description
-          Text('About', style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text(
-            treatment.description.isNotEmpty
-                ? treatment.description
-                : 'A premium spa experience tailored to your needs, '
-                    'delivered by certified therapists in the comfort of your home.',
-            style: text.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 28),
-
-          // Duration selector
-          if (treatment.durations.isNotEmpty) ...[
-            Text(
-              'Select Duration',
-              style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            DurationSelector(
-              durations: treatment.durations,
-              selectedId: selectedId ?? treatment.defaultDuration?.id,
-              onSelected: (id) => ref
-                  .read(selectedDurationIdProvider(treatment.id).notifier)
-                  .state = id,
-            ),
-            const SizedBox(height: 28),
-          ],
-
-          // What's included
-          Text(
-            "What's Included",
-            style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          ..._inclusions.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 10),
-                  Text(item, style: text.bodyMedium),
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _Hero(treatment: treatment)),
+                  SliverToBoxAdapter(
+                    child: _TreatmentOptions(
+                      treatment: treatment,
+                      durations: durations,
+                      selectedId: resolved?.id,
+                      onSelected: (id) =>
+                          ref
+                                  .read(
+                                    selectedDurationIdProvider(
+                                      treatment.id,
+                                    ).notifier,
+                                  )
+                                  .state =
+                              id,
+                    ),
+                  ),
                 ],
               ),
-            ),
+              // Back button stays put while the page scrolls under it.
+              Positioned(
+                top: 72,
+                left: 30,
+                child: GlassIconButton(
+                  svgAsset: _kIconBack,
+                  iconSize: 33,
+                  iconOffset: const Offset(6.5, 8.5),
+                  onTap: () => context.pop(),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 100), // space for bottom bar
-        ],
-      ),
+        ),
+        _CartBar(
+          price: resolved?.price ?? treatment.displayPrice,
+          onAddToCart: onAddToCart,
+        ),
+      ],
     );
   }
-
-  static const _inclusions = [
-    'Certified professional therapist',
-    'All equipment & supplies provided',
-    'Pre-treatment consultation',
-    'Post-treatment care tips',
-  ];
 }
 
-// ── Booking bar ────────────────────────────────────────────────────────────
+// ── Hero ─────────────────────────────────────────────────────────────────────
 
-class _BookingBar extends StatelessWidget {
-  final double price;
-  final int durationMinutes;
-  final VoidCallback onBook;
-
-  const _BookingBar({
-    required this.price,
-    required this.durationMinutes,
-    required this.onBook,
-  });
+class _Hero extends StatelessWidget {
+  final Treatment treatment;
+  const _Hero({required this.treatment});
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.border.withValues(alpha: 0.15))),
-        ),
-        child: Row(
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
+    final fallback = Image.asset(_kHeroFallback, fit: BoxFit.cover);
+    final url = treatment.imageUrl;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: ColoredBox(color: Color(0xFFD9D9D9))),
+          Positioned.fill(
+            child: url != null && url.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => fallback,
+                    errorWidget: (_, __, ___) => fallback,
+                  )
+                : fallback,
+          ),
+          // Gradient: clear at top → solid black at bottom.
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0xFF000000)],
+                ),
+              ),
+            ),
+          ),
+          // Pill top 160 → title box 188 (h 89, 2 lines of 38.981) →
+          // description 281; ~36 below it to the hero's 379 bottom.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(_kSide, 160, _kSide, 36),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  formatRupiah(price),
-                  style: text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
+                _PricePill(
+                  text: 'Starting from ${formatIdrK(treatment.startingPrice)}',
+                ),
+                const SizedBox(height: 4.725 + 5.52),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 269),
+                  child: Text(
+                    treatment.name,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Florian',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 50,
+                      color: Colors.white,
+                      height: 38.981 / 50,
+                      leadingDistribution: TextLeadingDistribution.even,
+                    ),
                   ),
                 ),
-                Text(
-                  '$durationMinutes min session',
-                  style: text.labelSmall
-                      ?.copyWith(color: AppColors.textSecondary),
+                const SizedBox(height: 5.52 + 4),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 315),
+                  child: Text(
+                    treatment.description,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w300,
+                      color: Colors.white,
+                      height: _kFigmaNormal,
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: FilledButton(
-                onPressed: onBook,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PricePill extends StatelessWidget {
+  final String text;
+  const _PricePill({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 23.275,
+      constraints: const BoxConstraints(minWidth: 155.844),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: _kBg,
+        borderRadius: BorderRadius.circular(5.06),
+        boxShadow: const [
+          BoxShadow(color: Color(0x38000000), blurRadius: 4.048), // 22%
+        ],
+      ),
+      child: Center(
+        widthFactor: 1,
+        child: Text(
+          text,
+          maxLines: 1,
+          style: GoogleFonts.montserrat(
+            fontSize: 12.144,
+            fontWeight: FontWeight.w400,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Select Your Treatments ───────────────────────────────────────────────────
+
+class _TreatmentOptions extends StatelessWidget {
+  final Treatment treatment;
+  final List<TreatmentDuration> durations;
+  final String? selectedId;
+  final ValueChanged<String> onSelected;
+
+  const _TreatmentOptions({
+    required this.treatment,
+    required this.durations,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  static const double _colGap = 17; // cards at x 29 and 212
+  static const double _rowGap = 17; // rows at y 461 and 593
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < durations.length; i += 2) {
+      Widget cell(int j) => j < durations.length
+          ? Expanded(
+              child: _OptionCard(
+                duration: durations[j],
+                selected: durations[j].id == selectedId,
+                onTap: () => onSelected(durations[j].id),
+              ),
+            )
+          : const Expanded(child: SizedBox.shrink());
+      if (i > 0) rows.add(const SizedBox(height: _rowGap));
+      rows.add(
+        Row(
+          children: [
+            cell(i),
+            const SizedBox(width: _colGap),
+            cell(i + 1),
+          ],
+        ),
+      );
+    }
+
+    // Title 400.43 (21.43 below hero) → subtitle 424 → grid 461.
+    return Padding(
+      // Grid ends 708; the price bar starts at 740.
+      padding: const EdgeInsets.fromLTRB(_kSide, 21.43, _kSideRight, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle('Select Your Treatments'),
+          const SizedBox(height: 4.07),
+          _Muted('you can only pick one treatment.'),
+          const SizedBox(height: 21.15),
+          ...rows,
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionCard extends StatelessWidget {
+  final TreatmentDuration duration;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OptionCard({
+    required this.duration,
+    required this.selected,
+    required this.onTap,
+  });
+
+  // CSS 154.02° gradient direction as a unit vector (x right, y down).
+  static final double _dx = math.sin(154.02 * math.pi / 180);
+  static final double _dy = -math.cos(154.02 * math.pi / 180);
+
+  static const double _border = 0.563;
+
+  @override
+  Widget build(BuildContext context) {
+    // Figma offsets from the card's outer edge: minutes (19, 58.67), label
+    // (19, 86.59). Subtract the border, which Container adds as padding.
+    const left = 19 - _border;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 115,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10.016),
+          // Border on both states keeps content from shifting.
+          border: Border.all(
+            color: selected
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.transparent,
+            width: _border,
+          ),
+          color: selected ? null : const Color(0x26BCBDB5), // 15%
+          gradient: selected
+              ? LinearGradient(
+                  begin: Alignment(-_dx, -_dy),
+                  end: Alignment(_dx, _dy),
+                  colors: const [Color(0xFF353A30), Color(0xFF3D402F)],
+                  stops: const [0.148, 1.0],
+                )
+              : null,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 58.67 - _border,
+              left: left,
+              right: 8,
+              child: Text(
+                '${duration.durationMinutes} MIN',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.montserrat(
+                  fontSize: 22.295,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  height: _kFigmaNormal,
                 ),
-                child: const Text(
-                  'Add to Cart',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+            ),
+            Positioned(
+              top: 86.59 - _border,
+              left: left,
+              right: 8,
+              child: Text(
+                'Signature Treatment',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.montserrat(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.white,
+                  height: _kFigmaNormal,
                 ),
               ),
             ),
@@ -308,54 +403,180 @@ class _BookingBar extends StatelessWidget {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Price bar + Add To Cart ──────────────────────────────────────────────────
 
-class _HeroPlaceholder extends StatelessWidget {
-  final Color color;
-  final String categoryName;
-  const _HeroPlaceholder({required this.color, required this.categoryName});
+class _CartBar extends StatelessWidget {
+  final double price;
+  final VoidCallback onAddToCart;
+  const _CartBar({required this.price, required this.onAddToCart});
 
   @override
   Widget build(BuildContext context) {
+    // Figma bar: y 740–854 (114 tall). Button 196×54 at y 760 (20 in), so 40
+    // below it — 6 + a 34pt home-indicator area.
+    final inset = MediaQuery.paddingOf(context).bottom;
+    final double bottom = 6 + math.max(inset, 34.0);
+
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.6)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          _categoryIcon(categoryName),
-          size: 96,
-          color: Colors.white.withValues(alpha: 0.25),
-        ),
+      color: _kBar,
+      padding: EdgeInsets.fromLTRB(_kSide, 20, _kSideRight, bottom),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            // "Price Treatment" at y 763 (3 below the button top).
+            padding: const EdgeInsets.only(top: 3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Price Treatment',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14.323,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: _kFigmaNormal,
+                  ),
+                ),
+                const SizedBox(height: 0.73), // price at y 781.19
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatIdrK(price),
+                    maxLines: 1,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 22.728,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      height: _kFigmaNormal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 196 wide at Figma size; on narrow screens the button gives up
+          // width before the price label does.
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 196),
+                child: Material(
+                  color: _kBg,
+                  borderRadius: BorderRadius.circular(9.464),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(9.464),
+                    onTap: onAddToCart,
+                    child: SizedBox(
+                      height: 54,
+                      child: Center(
+                        child: Text(
+                          'Add To Cart',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 15.143,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Badge({required this.label, required this.color});
+// ── Shared text styles ───────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  final String text;
+  const _SectionTitle(this.text);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+    return Text(
+      text,
+      style: GoogleFonts.montserrat(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.16,
+        color: Colors.white.withValues(alpha: 0.71),
+        height: _kFigmaNormal,
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+    );
+  }
+}
+
+class _Muted extends StatelessWidget {
+  final String text;
+  const _Muted(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.montserrat(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.13,
+        color: Colors.white.withValues(alpha: 0.45),
+        height: _kFigmaNormal,
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Could not load treatment',
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: AppColors.textOnDarkMuted,
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: Text(
+              'Retry',
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.cream,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.pop(),
+            child: Text(
+              'Back',
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: AppColors.textOnDarkMuted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -364,31 +585,9 @@ class _Badge extends StatelessWidget {
 TreatmentDuration? _resolveSelected(Treatment treatment, String? selectedId) {
   if (treatment.durations.isEmpty) return null;
   if (selectedId != null) {
-    try {
-      return treatment.durations.firstWhere((d) => d.id == selectedId);
-    } catch (_) {}
+    for (final d in treatment.durations) {
+      if (d.id == selectedId) return d;
+    }
   }
   return treatment.defaultDuration;
-}
-
-Color _categoryColor(String name) {
-  return switch (name.toLowerCase()) {
-    'massage' => AppColors.primary,
-    'facial' => AppColors.primaryDark,
-    'stone' || 'hot stone' => AppColors.secondary,
-    'scrub' || 'body scrub' => AppColors.gold,
-    'aromatherapy' => AppColors.primaryDark,
-    _ => AppColors.primary,
-  };
-}
-
-IconData _categoryIcon(String name) {
-  return switch (name.toLowerCase()) {
-    'massage' => Icons.self_improvement_rounded,
-    'facial' => Icons.face_retouching_natural,
-    'stone' || 'hot stone' => Icons.spa_rounded,
-    'scrub' || 'body scrub' => Icons.bubble_chart_rounded,
-    'aromatherapy' => Icons.local_florist_rounded,
-    _ => Icons.spa_outlined,
-  };
 }

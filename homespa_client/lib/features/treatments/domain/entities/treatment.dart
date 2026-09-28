@@ -40,20 +40,25 @@ class Treatment extends Equatable {
 
   double get displayPrice => defaultDuration?.price ?? basePrice;
 
+  /// Lowest price across durations ("Starting from …"), else the base price.
+  double get startingPrice => durations.isEmpty
+      ? basePrice
+      : durations.map((d) => d.price).reduce((a, b) => a < b ? a : b);
+
   int get displayDurationMinutes => defaultDuration?.durationMinutes ?? 60;
 
   @override
   List<Object?> get props => [
-        id,
-        name,
-        description,
-        categoryId,
-        categoryName,
-        imageUrl,
-        basePrice,
-        rating,
-        reviewCount,
-        isAvailable,
-        durations,
-      ];
+    id,
+    name,
+    description,
+    categoryId,
+    categoryName,
+    imageUrl,
+    basePrice,
+    rating,
+    reviewCount,
+    isAvailable,
+    durations,
+  ];
 }

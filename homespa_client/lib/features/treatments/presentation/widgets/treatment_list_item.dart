@@ -11,11 +11,7 @@ class TreatmentListItem extends StatelessWidget {
   final Treatment treatment;
   final VoidCallback? onTap;
 
-  const TreatmentListItem({
-    super.key,
-    required this.treatment,
-    this.onTap,
-  });
+  const TreatmentListItem({super.key, required this.treatment, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -46,18 +42,24 @@ class TreatmentListItem extends StatelessWidget {
               child: SizedBox(
                 width: 110,
                 height: 116,
-                child: treatment.imageUrl != null &&
-                        treatment.imageUrl!.isNotEmpty
+                child:
+                    treatment.imageUrl != null && treatment.imageUrl!.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: treatment.imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            _GradientBlock(color: color, name: treatment.categoryName),
-                        errorWidget: (_, __, ___) =>
-                            _GradientBlock(color: color, name: treatment.categoryName),
+                        placeholder: (_, __) => _GradientBlock(
+                          color: color,
+                          name: treatment.categoryName,
+                        ),
+                        errorWidget: (_, __, ___) => _GradientBlock(
+                          color: color,
+                          name: treatment.categoryName,
+                        ),
                       )
                     : _GradientBlock(
-                        color: color, name: treatment.categoryName),
+                        color: color,
+                        name: treatment.categoryName,
+                      ),
               ),
             ),
 
@@ -74,15 +76,18 @@ class TreatmentListItem extends StatelessWidget {
                     // Category tag
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryLight,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         treatment.categoryName.toUpperCase(),
-                        style: AppTypography.overline
-                            .copyWith(color: AppColors.primary),
+                        style: AppTypography.overline.copyWith(
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -90,8 +95,9 @@ class TreatmentListItem extends StatelessWidget {
                     // Name
                     Text(
                       treatment.name,
-                      style: AppTypography.labelLarge
-                          .copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.labelLarge.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -101,8 +107,9 @@ class TreatmentListItem extends StatelessWidget {
                     if (treatment.name.length > 10)
                       Text(
                         'Professional in-home treatment',
-                        style: AppTypography.bodySmall
-                            .copyWith(color: AppColors.textMuted),
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textMuted,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -111,13 +118,17 @@ class TreatmentListItem extends StatelessWidget {
                     // Duration + price row
                     Row(
                       children: [
-                        const Icon(Icons.access_time_rounded,
-                            size: 12, color: AppColors.textMuted),
+                        const Icon(
+                          Icons.access_time_rounded,
+                          size: 12,
+                          color: AppColors.textMuted,
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           '${treatment.displayDurationMinutes} min',
-                          style: AppTypography.labelSmall
-                              .copyWith(color: AppColors.textMuted),
+                          style: AppTypography.labelSmall.copyWith(
+                            color: AppColors.textMuted,
+                          ),
                         ),
                         const Spacer(),
                         Text(
@@ -143,8 +154,11 @@ class TreatmentListItem extends StatelessWidget {
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.primary, size: 18),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ),
             ),
           ],

@@ -29,4 +29,14 @@ abstract final class AppColors {
 
   // ── Overlay for image cards (keeps text readable) ─────────────────────────────
   static const Color cardOverlay = Color(0xCC313129);
+
+  // ── Dark olive theme (luxury spa redesign) ────────────────────────────────────
+  static const Color darkOlive = Color(0xFF434930); // page background
+  static const Color navBarDark = Color(
+    0xFF313129,
+  ); // bottom nav (darker than page)
+  static const Color darkOliveLight = Color(0xFF4E523B); // buttons/accents
+  static const Color cream = Color(0xFFFAF7F2); // white text areas
+  static const Color textOnDark = Color(0xFFF5F0E8); // text on dark bg
+  static const Color textOnDarkMuted = Color(0xB3FAF7F2); // 70% white
 }

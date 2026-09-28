@@ -1,9 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../booking/domain/entities/order_summary.dart';
+import '../../../booking/presentation/providers/order_history_providers.dart';
 import '../../domain/entities/treatment_preview.dart';
 
-final popularTreatmentsProvider = FutureProvider<List<TreatmentPreview>>((ref) async {
+final popularTreatmentsProvider = FutureProvider<List<TreatmentPreview>>((
+  ref,
+) async {
   final client = Supabase.instance.client;
 
   try {
@@ -62,4 +66,17 @@ final popularTreatmentsProvider = FutureProvider<List<TreatmentPreview>>((ref) a
   } catch (_) {
     return [];
   }
+});
+
+// ── Recent orders ─────────────────────────────────────────────────────────────
+
+const int _kRecentOrdersLimit = 3;
+
+/// The signed-in client's latest **completed** bookings (newest first, top 3).
+/// Derived from [orderHistoryProvider], so it updates in realtime too.
+final recentOrdersProvider = FutureProvider.autoDispose<List<OrderSummary>>((
+  ref,
+) async {
+  final orders = await ref.watch(orderHistoryProvider.future);
+  return orders.where((o) => o.isCompleted).take(_kRecentOrdersLimit).toList();
 });

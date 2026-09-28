@@ -8,6 +8,8 @@ class GetTreatmentsUseCase {
   final TreatmentsRepository _repository;
   const GetTreatmentsUseCase(this._repository);
 
-  Future<Either<Failure, List<Treatment>>> call({String? categoryId}) =>
-      _repository.getTreatments(categoryId: categoryId);
+  Future<Either<Failure, List<Treatment>>> call({
+    String? categoryId,
+    String? query,
+  }) => _repository.getTreatments(categoryId: categoryId, query: query);
 }

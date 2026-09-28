@@ -23,28 +23,27 @@ class BookingDetailPage extends ConsumerWidget {
     final state = ref.watch(bookingDetailProvider(bookingId));
     // Realtime status comes from the stream; falls back to notifier state
     final streamAsync = ref.watch(bookingDetailStreamProvider(bookingId));
-    final rawStatus = streamAsync.value?['status'] as String? ??
+    final rawStatus =
+        streamAsync.value?['status'] as String? ??
         _bookingStatusToString(state.detail?.status) ??
         'pending';
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Booking Details'),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('Booking Details'), centerTitle: false),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.error != null
-              ? _ErrorView(
-                  message: state.error!,
-                  onRetry: () =>
-                      ref.read(bookingDetailProvider(bookingId).notifier).reload(),
-                )
-              : state.detail == null
-                  ? const Center(child: Text('No data found'))
-                  : _DetailBody(detail: state.detail!, realtimeStatus: rawStatus),
-      bottomNavigationBar: state.detail != null &&
+          ? _ErrorView(
+              message: state.error!,
+              onRetry: () =>
+                  ref.read(bookingDetailProvider(bookingId).notifier).reload(),
+            )
+          : state.detail == null
+          ? const Center(child: Text('No data found'))
+          : _DetailBody(detail: state.detail!, realtimeStatus: rawStatus),
+      bottomNavigationBar:
+          state.detail != null &&
               rawStatus == 'completed' &&
               !state.detail!.hasExistingReview &&
               state.detail!.therapistId != null
@@ -121,7 +120,8 @@ class _DetailBody extends StatelessWidget {
             _InfoRow(
               icon: Icons.calendar_today_rounded,
               label: 'Date & Time',
-              value: '${DateFormat('EEEE, d MMMM y • HH:mm').format(WIB.toWIB(detail.scheduledAt))} WIB',
+              value:
+                  '${DateFormat('EEEE, d MMMM y • HH:mm').format(WIB.toWIB(detail.scheduledAt))} WIB',
             ),
           ],
         ),
@@ -148,14 +148,12 @@ class _DetailBody extends StatelessWidget {
               ? [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      'Kaizen Spa Service',
-                      style: text.bodyMedium,
-                    ),
+                    child: Text('Kaizen Spa Service', style: text.bodyMedium),
                   ),
                 ]
               : detail.treatments
-                  .map((t) => Padding(
+                    .map(
+                      (t) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
@@ -168,19 +166,25 @@ class _DetailBody extends StatelessWidget {
                                         ? '${t.name} • ${t.durationMinutes} min'
                                         : t.name,
                                     style: text.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.w600),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   if (t.quantity > 1)
-                                    Text('x${t.quantity}',
-                                        style: text.labelSmall?.copyWith(
-                                            color: AppColors.textSecondary)),
+                                    Text(
+                                      'x${t.quantity}',
+                                      style: text.labelSmall?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
                             if (t.price == 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.goldDark,
                                   borderRadius: BorderRadius.circular(6),
@@ -198,13 +202,15 @@ class _DetailBody extends StatelessWidget {
                               Text(
                                 formatRupiah(t.price * t.quantity),
                                 style: AppTypography.labelLarge.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary),
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
                               ),
                           ],
                         ),
-                      ))
-                  .toList(),
+                      ),
+                    )
+                    .toList(),
         ),
 
         // ── Add-ons ─────────────────────────────────────────────────────────
@@ -214,27 +220,30 @@ class _DetailBody extends StatelessWidget {
           const SizedBox(height: 8),
           _SectionCard(
             children: detail.addons
-                .map((a) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              a.quantity > 1
-                                  ? '${a.name} x${a.quantity}'
-                                  : a.name,
-                              style: text.bodyMedium,
-                            ),
+                .map(
+                  (a) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            a.quantity > 1
+                                ? '${a.name} x${a.quantity}'
+                                : a.name,
+                            style: text.bodyMedium,
                           ),
-                          Text(
-                            formatRupiah(a.price * a.quantity),
-                            style: AppTypography.labelLarge.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary),
+                        ),
+                        Text(
+                          formatRupiah(a.price * a.quantity),
+                          style: AppTypography.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
-                        ],
-                      ),
-                    ))
+                        ),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -354,7 +363,8 @@ class _TherapistSection extends StatelessWidget {
           // Avatar
           ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: detail.therapistAvatarUrl != null &&
+            child:
+                detail.therapistAvatarUrl != null &&
                     detail.therapistAvatarUrl!.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: detail.therapistAvatarUrl!,
@@ -373,21 +383,24 @@ class _TherapistSection extends StatelessWidget {
               children: [
                 Text(
                   detail.therapistName ?? 'Therapist',
-                  style:
-                      text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                  style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 if (detail.therapistRating != null) ...[
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded,
-                          size: 14, color: Color(0xFFFFC107)),
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 14,
+                        color: Color(0xFFFFC107),
+                      ),
                       const SizedBox(width: 3),
                       Text(
                         detail.therapistRating!.toStringAsFixed(1),
                         style: text.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -529,8 +542,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
             const SizedBox(height: 4),
             Text(
               'How was your session with ${widget.therapistName}?',
-              style:
-                  text.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              style: text.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
           const SizedBox(height: 24),
@@ -560,16 +572,16 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
             decoration: InputDecoration(
               hintText: 'Write a review (optional)…',
               filled: true,
-              fillColor:
-                  AppColors.surfaceVariant.withValues(alpha: 0.4),
+              fillColor: AppColors.surfaceVariant.withValues(alpha: 0.4),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+                borderSide: BorderSide(
+                  color: AppColors.border.withValues(alpha: 0.3),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -590,7 +602,9 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
                     final nav = Navigator.of(context);
                     try {
                       await ref
-                          .read(bookingDetailProvider(widget.bookingId).notifier)
+                          .read(
+                            bookingDetailProvider(widget.bookingId).notifier,
+                          )
                           .submitReview(
                             rating: _rating,
                             reviewText: _reviewController.text,
@@ -623,13 +637,14 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child:
-                        CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Text(
                     'Submit Review',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
           ),
         ],
@@ -652,8 +667,7 @@ class _StatusBadge extends StatelessWidget {
       'therapist_assigned' ||
       'rider_assigned' ||
       'on_the_way' ||
-      'arrived' =>
-        const Color(0xFF3B82F6),
+      'arrived' => const Color(0xFF3B82F6),
       'in_progress' => const Color(0xFF8B5CF6),
       'completed' => const Color(0xFF10B981),
       'cancelled' => const Color(0xFF6B7280),
@@ -681,7 +695,10 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-            color: color, fontSize: 13, fontWeight: FontWeight.w700),
+          color: color,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -696,10 +713,10 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       label,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.1,
-            color: AppColors.textSecondary,
-          ),
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.1,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 }
@@ -729,8 +746,11 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoRow(
-      {required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -744,9 +764,12 @@ class _InfoRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: text.labelSmall
-                      ?.copyWith(color: AppColors.textSecondary)),
+              Text(
+                label,
+                style: text.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 2),
               Text(value, style: text.bodyMedium),
             ],
@@ -787,14 +810,15 @@ class _PaymentRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: text.bodyMedium?.copyWith(
-                  color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
-                  fontWeight: weight)),
           Text(
-            value < 0
-                ? '-${formatRupiah(-value)}'
-                : formatRupiah(value),
+            label,
+            style: text.bodyMedium?.copyWith(
+              color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+              fontWeight: weight,
+            ),
+          ),
+          Text(
+            value < 0 ? '-${formatRupiah(-value)}' : formatRupiah(value),
             style: style,
           ),
         ],
@@ -867,15 +891,17 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded,
-                size: 48, color: AppColors.textSecondary),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 12),
             Text(
               'Could not load booking details',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -890,10 +916,10 @@ class _ErrorView extends StatelessWidget {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 String? _bookingStatusToString(BookingStatus? status) => switch (status) {
-      BookingStatus.pending => 'pending',
-      BookingStatus.confirmed => 'therapist_assigned',
-      BookingStatus.inProgress => 'in_progress',
-      BookingStatus.completed => 'completed',
-      BookingStatus.cancelled => 'cancelled',
-      null => null,
-    };
+  BookingStatus.pending => 'pending',
+  BookingStatus.confirmed => 'therapist_assigned',
+  BookingStatus.inProgress => 'in_progress',
+  BookingStatus.completed => 'completed',
+  BookingStatus.cancelled => 'cancelled',
+  null => null,
+};

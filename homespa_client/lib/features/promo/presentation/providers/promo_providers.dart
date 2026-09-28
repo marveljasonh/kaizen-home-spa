@@ -10,6 +10,11 @@ final _promoDataSourceProvider = Provider<PromoRemoteDataSource>(
   (ref) => PromoRemoteDataSourceImpl(Supabase.instance.client),
 );
 
+/// Tab the Promos page should switch to (0 Promos, 1 Rewards), set by other
+/// pages before they navigate to /promo (e.g. Profile → Point & Rewards).
+/// The page clears it once it has switched.
+final promoTabRequestProvider = StateProvider<int?>((ref) => null);
+
 final bannersProvider = FutureProvider<List<PromoBanner>>((ref) async {
   return ref.read(_promoDataSourceProvider).getBanners();
 });

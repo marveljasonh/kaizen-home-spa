@@ -30,7 +30,9 @@ class BookingRepositoryImpl implements BookingRepository {
       return Right(await _dataSource.validateVoucher(code));
     } on PostgrestException catch (e) {
       return Left(
-        AuthFailure(e.code == 'PGRST116' ? 'Invalid or expired voucher' : e.message),
+        AuthFailure(
+          e.code == 'PGRST116' ? 'Invalid or expired voucher' : e.message,
+        ),
       );
     } catch (e) {
       return Left(ServerFailure(e.toString()));

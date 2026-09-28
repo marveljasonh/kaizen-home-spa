@@ -8,7 +8,6 @@ import '../../../treatments/domain/entities/treatment_duration.dart';
 import '../../domain/entities/payment_method.dart';
 import '../../domain/entities/service_address.dart';
 import '../../domain/entities/therapist.dart';
-import '../../domain/entities/time_slot.dart';
 import '../../domain/entities/voucher.dart';
 
 // ── Add-on selection ──────────────────────────────────────────────────────────
@@ -42,8 +41,11 @@ class CartItem {
   int get durationMinutes =>
       selectedDuration?.durationMinutes ?? treatment.displayDurationMinutes;
 
-  CartItem withDuration(TreatmentDuration duration) =>
-      CartItem(treatment: treatment, selectedDuration: duration, addons: addons);
+  CartItem withDuration(TreatmentDuration duration) => CartItem(
+    treatment: treatment,
+    selectedDuration: duration,
+    addons: addons,
+  );
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -51,8 +53,9 @@ class CartItem {
 class BookingCart {
   final List<CartItem> items;
   final Therapist? therapist;
-  final DateTime? selectedDate;
-  final TimeSlot? selectedTimeSlot;
+
+  /// Chosen start time in UTC. Picked in WIB on the Schedule page.
+  final DateTime? scheduledAt;
   final ServiceAddress? address;
   final Voucher? voucher;
   final PaymentMethod? paymentMethod;
@@ -69,8 +72,7 @@ class BookingCart {
   const BookingCart({
     this.items = const [],
     this.therapist,
-    this.selectedDate,
-    this.selectedTimeSlot,
+    this.scheduledAt,
     this.address,
     this.voucher,
     this.paymentMethod,
@@ -122,36 +124,38 @@ class BookingCart {
   // True only when the entire bill is covered by the free reward (no paid items).
   bool get isTotallyFree => total == 0 && freeRewardId != null;
 
-  bool get scheduleReady => selectedDate != null && selectedTimeSlot != null;
+  /// Total treatment time: every paid item plus the free reward treatment.
+  int get totalDurationMinutes =>
+      items.fold(0, (sum, item) => sum + item.durationMinutes) +
+      (freeRewardDurationMinutes ?? 0);
+
+  bool get scheduleReady => scheduledAt != null;
   bool get addressReady => address != null;
 
   BookingCart _copyCore({
     List<CartItem>? items,
-    DateTime? selectedDate,
-    TimeSlot? selectedTimeSlot,
+    DateTime? scheduledAt,
     ServiceAddress? address,
     PaymentMethod? paymentMethod,
     bool? isLoading,
     String? error,
-  }) =>
-      BookingCart(
-        items: items ?? this.items,
-        therapist: therapist,
-        selectedDate: selectedDate ?? this.selectedDate,
-        selectedTimeSlot: selectedTimeSlot ?? this.selectedTimeSlot,
-        address: address ?? this.address,
-        voucher: voucher,
-        paymentMethod: paymentMethod ?? this.paymentMethod,
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-        freeRewardId: freeRewardId,
-        freeRewardTitle: freeRewardTitle,
-        freeRewardTreatmentId: freeRewardTreatmentId,
-        freeRewardDurationMinutes: freeRewardDurationMinutes,
-        rewardDiscount: rewardDiscount,
-        rewardDiscountType: rewardDiscountType,
-        rewardRedemptionId: rewardRedemptionId,
-      );
+  }) => BookingCart(
+    items: items ?? this.items,
+    therapist: therapist,
+    scheduledAt: scheduledAt ?? this.scheduledAt,
+    address: address ?? this.address,
+    voucher: voucher,
+    paymentMethod: paymentMethod ?? this.paymentMethod,
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+    freeRewardId: freeRewardId,
+    freeRewardTitle: freeRewardTitle,
+    freeRewardTreatmentId: freeRewardTreatmentId,
+    freeRewardDurationMinutes: freeRewardDurationMinutes,
+    rewardDiscount: rewardDiscount,
+    rewardDiscountType: rewardDiscountType,
+    rewardRedemptionId: rewardRedemptionId,
+  );
 }
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
@@ -186,8 +190,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: state.voucher,
       paymentMethod: state.paymentMethod,
@@ -207,8 +210,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: state.voucher,
       paymentMethod: state.paymentMethod,
@@ -222,8 +224,10 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     );
   }
 
-  void selectSchedule(DateTime date, TimeSlot slot) {
-    state = state._copyCore(selectedDate: date, selectedTimeSlot: slot);
+  /// [scheduledAtUtc] must already be converted from WIB (see
+  /// [WIB.wibToUtc]).
+  void selectSchedule(DateTime scheduledAtUtc) {
+    state = state._copyCore(scheduledAt: scheduledAtUtc.toUtc());
   }
 
   void setAddress(ServiceAddress address) {
@@ -234,8 +238,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: v,
       paymentMethod: state.paymentMethod,
@@ -253,8 +256,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       paymentMethod: state.paymentMethod,
       freeRewardId: state.freeRewardId,
@@ -279,8 +281,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: state.voucher,
       paymentMethod: state.paymentMethod,
@@ -305,8 +306,7 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: null,
       paymentMethod: state.paymentMethod,
@@ -320,12 +320,15 @@ class BookingCartNotifier extends Notifier<BookingCart> {
     );
   }
 
-  void applyDiscountReward(String redemptionId, int discountAmount, String type) {
+  void applyDiscountReward(
+    String redemptionId,
+    int discountAmount,
+    String type,
+  ) {
     state = BookingCart(
       items: state.items,
       therapist: state.therapist,
-      selectedDate: state.selectedDate,
-      selectedTimeSlot: state.selectedTimeSlot,
+      scheduledAt: state.scheduledAt,
       address: state.address,
       voucher: state.voucher,
       paymentMethod: state.paymentMethod,

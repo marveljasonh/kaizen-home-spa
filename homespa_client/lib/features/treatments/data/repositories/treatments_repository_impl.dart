@@ -26,9 +26,12 @@ class TreatmentsRepositoryImpl implements TreatmentsRepository {
   @override
   Future<Either<Failure, List<Treatment>>> getTreatments({
     String? categoryId,
+    String? query,
   }) async {
     try {
-      return Right(await _dataSource.getTreatments(categoryId: categoryId));
+      return Right(
+        await _dataSource.getTreatments(categoryId: categoryId, query: query),
+      );
     } on PostgrestException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

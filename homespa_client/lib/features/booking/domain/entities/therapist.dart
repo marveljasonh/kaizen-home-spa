@@ -26,6 +26,16 @@ class Therapist extends Equatable {
   });
 
   @override
-  List<Object?> get props =>
-      [id, name, bio, avatarUrl, rating, reviewCount, specialties, bookingCount, status, isAvailable];
+  List<Object?> get props => [
+    id,
+    name,
+    bio,
+    avatarUrl,
+    rating,
+    reviewCount,
+    specialties,
+    bookingCount,
+    status,
+    isAvailable,
+  ];
 }

@@ -76,8 +76,10 @@ class TreatmentCard extends StatelessWidget {
                 top: 10,
                 right: 10,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: hasImage
                         ? Colors.black.withValues(alpha: 0.45)
@@ -120,9 +122,7 @@ class TreatmentCard extends StatelessWidget {
                     Text(
                       treatment.name,
                       style: AppTypography.headingSmall.copyWith(
-                        color: hasImage
-                            ? Colors.white
-                            : AppColors.textPrimary,
+                        color: hasImage ? Colors.white : AppColors.textPrimary,
                         fontSize: 15,
                       ),
                       maxLines: 2,
@@ -132,9 +132,7 @@ class TreatmentCard extends StatelessWidget {
                     Text(
                       'from ${formatRupiah(treatment.price)}',
                       style: AppTypography.labelMedium.copyWith(
-                        color: hasImage
-                            ? AppColors.gold
-                            : AppColors.primary,
+                        color: hasImage ? AppColors.gold : AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

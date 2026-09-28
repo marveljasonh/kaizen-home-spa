@@ -1,15 +1,47 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/timezone_helper.dart';
-import '../../domain/entities/time_slot.dart';
+import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/booking_cart.dart';
+import '../providers/booking_providers.dart';
 import '../widgets/booking_step_indicator.dart';
 
+// ── Booking window (all times WIB) ────────────────────────────────────────────
+
+/// Earliest start time of the day, in minutes after midnight (08:00).
+const int _kOpenMinutes = 8 * 60;
+
+/// Latest start time of the day, in minutes after midnight (23:00).
+const int _kCloseMinutes = 23 * 60;
+
+/// Bookings must start at least this long after "now".
+const int _kLeadMinutes = 50;
+
+/// How many days past today can be booked.
+const int _kDaysAhead = 30;
+
+/// Minute wheel step (00, 10, 20 …).
+const int _kMinuteStep = 10;
+
+/// Gap kept free between one of a therapist's bookings and the next.
+const int _kBufferMinutes = 30;
+
+// ── Wheel styling ─────────────────────────────────────────────────────────────
+
+const double _kItemExtent = 56;
+const int _kVisibleItems = 5;
+const Color _kCream = AppColors.surface; // #F5F0E8
+
+/// Schedule step: a Date | Hour | Minutes wheel picker. Times before
+/// now + [_kLeadMinutes] or outside opening hours snap to the earliest valid
+/// time, and the chosen slot is checked against the therapist's bookings.
 class SchedulePage extends ConsumerStatefulWidget {
   const SchedulePage({super.key});
 
@@ -18,363 +50,612 @@ class SchedulePage extends ConsumerStatefulWidget {
 }
 
 class _SchedulePageState extends ConsumerState<SchedulePage> {
-  final DateTime _today = WIB.now();
-  TimeOfDay? _selectedTime;
+  late List<DateTime> _dates; // WIB calendar days (UTC-flagged, midnight)
+  late int _earliestMinutes; // minutes after midnight on _dates.first
+  late int _dateIndex;
+  late int _hour;
+  late int _minute;
 
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final cart = ref.watch(bookingCartProvider);
-    final therapistId = cart.therapist?.id;
+  late final FixedExtentScrollController _dateCtrl;
+  late final FixedExtentScrollController _hourCtrl;
+  late final FixedExtentScrollController _minuteCtrl;
+  Timer? _clock;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Date & Time'),
-        bottom: const BookingStepIndicator(currentStep: 3),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Today banner ─────────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border(
-                    bottom: BorderSide(
-                        color: AppColors.border.withValues(alpha: 0.5))),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.calendar_today_rounded,
-                        color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat('EEEE, d MMMM y').format(_today),
-                        style: text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Bookings are available for today only',
-                        style: text.bodySmall
-                            ?.copyWith(color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Today',
-                      style: text.labelSmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Available Times header ────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Available Times',
-                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Legend ────────────────────────────────────────────────────────
-            if (therapistId != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _LegendDot(color: const Color(0xFFF5F0E8)),
-                    const SizedBox(width: 4),
-                    Text('Past',
-                        style: text.bodySmall
-                            ?.copyWith(color: AppColors.textMuted)),
-                    const SizedBox(width: 14),
-                    _LegendDot(color: const Color(0xFFF59E0B)),
-                    const SizedBox(width: 4),
-                    Text('Booked',
-                        style: text.bodySmall
-                            ?.copyWith(color: AppColors.textMuted)),
-                    const SizedBox(width: 14),
-                    _LegendDot(color: const Color(0xFF4E523B)),
-                    const SizedBox(width: 4),
-                    Text('Available',
-                        style: text.bodySmall
-                            ?.copyWith(color: AppColors.textMuted)),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 12),
-
-            // ── Slot picker ───────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _TimeSlotPicker(
-                therapistId: therapistId,
-                selectedDate: _today,
-                selectedTime: _selectedTime,
-                onTimeSelected: (t) => setState(() => _selectedTime = t),
-              ),
-            ),
-
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-          child: FilledButton(
-            onPressed: _selectedTime != null ? _onContinue : null,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-            child: const Text('Continue',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onContinue() {
-    if (_selectedTime == null) return;
-    final hour = _selectedTime!.hour;
-    final period = hour < 12 ? 'AM' : 'PM';
-    final h12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-    final slot = TimeSlot(
-      id: '${hour.toString().padLeft(2, '0')}:00',
-      displayLabel: '$h12:00 $period',
-      hour: hour,
-      isAvailable: true,
-    );
-    ref.read(bookingCartProvider.notifier).selectSchedule(_today, slot);
-    context.push('/booking/location');
-  }
-}
-
-// ── Time slot picker ───────────────────────────────────────────────────────────
-
-class _TimeSlotPicker extends StatefulWidget {
-  final String? therapistId;
-  final DateTime selectedDate;
-  final TimeOfDay? selectedTime;
-  final void Function(TimeOfDay) onTimeSelected;
-
-  const _TimeSlotPicker({
-    required this.therapistId,
-    required this.selectedDate,
-    required this.selectedTime,
-    required this.onTimeSelected,
-  });
-
-  @override
-  State<_TimeSlotPicker> createState() => _TimeSlotPickerState();
-}
-
-class _TimeSlotPickerState extends State<_TimeSlotPicker> {
-  Set<String> _bookedSlots = {};
-  bool _loading = true;
+  static const int _firstHour = _kOpenMinutes ~/ 60;
+  static const int _lastHour = _kCloseMinutes ~/ 60;
+  static final List<int> _minutes = [
+    for (int m = 0; m < 60; m += _kMinuteStep) m,
+  ];
 
   @override
   void initState() {
     super.initState();
-    _fetchBookedSlots();
+    _rebuildWindow();
+
+    // Resume a time picked earlier in this flow, if it is still valid.
+    final saved = ref.read(bookingCartProvider).scheduledAt;
+    var start = (_dates.first, _earliestMinutes);
+    if (saved != null) {
+      final w = WIB.toWIB(saved);
+      final day = DateTime.utc(w.year, w.month, w.day);
+      final i = _dates.indexOf(day);
+      final mins = w.hour * 60 + w.minute;
+      if (i >= 0 && mins >= _minMinutesFor(i) && mins <= _kCloseMinutes) {
+        start = (day, mins);
+      }
+    }
+    _dateIndex = _dates.indexOf(start.$1);
+    _hour = start.$2 ~/ 60;
+    _minute = start.$2 % 60;
+
+    _dateCtrl = FixedExtentScrollController(initialItem: _dateIndex);
+    _hourCtrl = FixedExtentScrollController(initialItem: _hour - _firstHour);
+    _minuteCtrl = FixedExtentScrollController(
+      initialItem: _minutes.indexOf(_minute),
+    );
+
+    // Keep the minimum honest while the page stays open.
+    _clock = Timer.periodic(const Duration(seconds: 30), (_) => _onTick());
   }
 
   @override
-  void didUpdateWidget(_TimeSlotPicker old) {
-    super.didUpdateWidget(old);
-    if (old.therapistId != widget.therapistId ||
-        old.selectedDate != widget.selectedDate) {
-      _fetchBookedSlots();
-    }
+  void dispose() {
+    _clock?.cancel();
+    _dateCtrl.dispose();
+    _hourCtrl.dispose();
+    _minuteCtrl.dispose();
+    super.dispose();
   }
 
-  Future<void> _fetchBookedSlots() async {
-    if (widget.therapistId == null) {
-      if (mounted) setState(() { _bookedSlots = {}; _loading = false; });
-      return;
-    }
-    if (mounted) setState(() => _loading = true);
+  // ── Window maths ────────────────────────────────────────────────────────────
 
-    final rows = List<Map<String, dynamic>>.from(
-      await Supabase.instance.client
-          .from('bookings')
-          .select('scheduled_at')
-          .eq('therapist_id', widget.therapistId!)
-          .not('status', 'in', '("completed","cancelled")')
-          .gte('scheduled_at', WIB.startOfTodayUtc().toIso8601String())
-          .lt('scheduled_at', WIB.endOfTodayUtc().toIso8601String()),
+  /// Recomputes the earliest bookable moment and the selectable dates.
+  void _rebuildWindow() {
+    final now = WIB.now();
+    const stepMs = _kMinuteStep * 60 * 1000;
+    final leadMs = now
+        .add(const Duration(minutes: _kLeadMinutes))
+        .millisecondsSinceEpoch;
+    // Round up to the next step. WIB is a whole number of steps from UTC,
+    // so rounding the epoch value rounds the WIB clock too.
+    final earliest = DateTime.fromMillisecondsSinceEpoch(
+      (leadMs + stepMs - 1) ~/ stepMs * stepMs,
+      isUtc: true,
     );
 
-    final slots = <String>{};
-    for (final b in rows) {
-      final scheduledAt = b['scheduled_at'] as String?;
-      if (scheduledAt != null) {
-        final wib = WIB.toWIB(DateTime.parse(scheduledAt));
-        final key =
-            '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
-        debugPrint('Added booked slot: $key (${WIB.formatTime(DateTime.parse(scheduledAt))} WIB)');
-        slots.add(key);
-      }
+    var day = DateTime.utc(earliest.year, earliest.month, earliest.day);
+    var mins = earliest.hour * 60 + earliest.minute;
+    if (mins < _kOpenMinutes) {
+      mins = _kOpenMinutes;
+    } else if (mins > _kCloseMinutes) {
+      day = day.add(const Duration(days: 1));
+      mins = _kOpenMinutes;
     }
-    debugPrint('All booked slots for ${widget.therapistId}: $slots');
 
-    if (mounted) setState(() { _bookedSlots = slots; _loading = false; });
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final last = today.add(const Duration(days: _kDaysAhead));
+    _dates = [
+      for (var d = day; !d.isAfter(last); d = d.add(const Duration(days: 1))) d,
+    ];
+    _earliestMinutes = mins;
   }
+
+  int _minMinutesFor(int dateIndex) =>
+      dateIndex == 0 ? _earliestMinutes : _kOpenMinutes;
+
+  bool _hourEnabled(int hour) {
+    final min = _minMinutesFor(_dateIndex);
+    return hour * 60 + _minutes.last >= min && hour * 60 <= _kCloseMinutes;
+  }
+
+  bool _minuteEnabled(int minute) {
+    final t = _hour * 60 + minute;
+    return t >= _minMinutesFor(_dateIndex) && t <= _kCloseMinutes;
+  }
+
+  DateTime get _selectedWib =>
+      _dates[_dateIndex].add(Duration(hours: _hour, minutes: _minute));
+
+  /// Snaps the wheels forward/back to the nearest valid time.
+  void _normalize() {
+    final t = (_hour * 60 + _minute).clamp(
+      _minMinutesFor(_dateIndex),
+      _kCloseMinutes,
+    );
+    final h = t ~/ 60;
+    final m = t % 60;
+    if (h == _hour && m == _minute) return;
+    setState(() {
+      _hour = h;
+      _minute = m;
+    });
+    _animate(_hourCtrl, h - _firstHour);
+    _animate(_minuteCtrl, _minutes.indexOf(m));
+  }
+
+  void _onTick() {
+    final selectedDay = _dates[_dateIndex];
+    setState(() {
+      _rebuildWindow();
+      final i = _dates.indexOf(selectedDay);
+      _dateIndex = i >= 0 ? i : 0;
+    });
+    if (_dateCtrl.hasClients && _dateCtrl.selectedItem != _dateIndex) {
+      _dateCtrl.jumpToItem(_dateIndex);
+    }
+    _normalize();
+  }
+
+  void _animate(FixedExtentScrollController c, int index) {
+    if (!c.hasClients || c.selectedItem == index) return;
+    c.animateToItem(
+      index,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
+    final cart = ref.watch(bookingCartProvider);
+    final therapist = cart.therapist;
+    final availability = _checkAvailability(cart);
 
-    final now = WIB.now();
-    final timeSlots = <TimeOfDay>[
-      for (int h = 8; h <= 23; h++) TimeOfDay(hour: h, minute: 0),
-    ];
+    return FlowScaffold(
+      title: 'Select Date & Time',
+      header: const BookingStepIndicator(currentStep: 3),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(kFlowGutter, 20, kFlowGutter, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SummaryBanner(selectedWib: _selectedWib),
+            const SizedBox(height: 24),
+            _buildPicker(),
+            if (therapist != null) ...[
+              const SizedBox(height: 16),
+              _AvailabilityNote(
+                state: availability,
+                therapistName: therapist.name,
+              ),
+            ],
+          ],
+        ),
+      ),
+      bottomBar: FlowPrimaryButton(
+        label: 'Continue',
+        onTap: availability.blocksContinue ? null : _onContinue,
+      ),
+    );
+  }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: timeSlots.map((slot) {
-        final slotKey =
-            '${slot.hour.toString().padLeft(2, '0')}:${slot.minute.toString().padLeft(2, '0')}';
-        final isBooked = _bookedSlots.contains(slotKey);
-        // Past = slot hour has already started today
-        final isPast = slot.hour <= now.hour;
-        final isSelected = widget.selectedTime?.hour == slot.hour;
+  _Availability _checkAvailability(BookingCart cart) {
+    final therapistId = cart.therapist?.id;
+    if (therapistId == null) return _Availability.free;
 
-        debugPrint('Slot $slotKey — booked: $isBooked, past: $isPast');
+    final windows = ref.watch(
+      therapistBusyWindowsProvider((
+        therapistId: therapistId,
+        dayWib: _dates[_dateIndex],
+      )),
+    );
+    return windows.when(
+      loading: () => _Availability.checking,
+      error: (e, _) {
+        debugPrint('Therapist availability check failed: $e');
+        return _Availability.unknown;
+      },
+      data: (busy) {
+        final start = WIB.wibToUtc(_selectedWib);
+        final minutes = cart.totalDurationMinutes > 0
+            ? cart.totalDurationMinutes
+            : kDefaultBookingMinutes;
+        final end = start.add(Duration(minutes: minutes));
+        const buffer = Duration(minutes: _kBufferMinutes);
+        final clash = busy.any(
+          (b) =>
+              start.isBefore(b.endUtc.add(buffer)) &&
+              b.startUtc.isBefore(end.add(buffer)),
+        );
+        return clash ? _Availability.conflict : _Availability.free;
+      },
+    );
+  }
 
-        final Color bgColor;
-        final Color borderColor;
-        final Color textColor;
-
-        if (isPast) {
-          bgColor = const Color(0xFFF5F0E8).withValues(alpha: 0.4);
-          borderColor = const Color(0xFFEBE4D9).withValues(alpha: 0.4);
-          textColor = const Color(0xFF2C2C2A).withValues(alpha: 0.3);
-        } else if (isBooked) {
-          bgColor = const Color(0xFFFFF3CD);
-          borderColor = const Color(0xFFFFE082);
-          textColor = const Color(0xFF856404);
-        } else if (isSelected) {
-          bgColor = const Color(0xFF4E523B);
-          borderColor = const Color(0xFF4E523B);
-          textColor = Colors.white;
-        } else {
-          bgColor = const Color(0xFFF5F0E8);
-          borderColor = const Color(0xFFEBE4D9);
-          textColor = const Color(0xFF2C2C2A);
-        }
-
-        return GestureDetector(
-          onTap: isPast
-              ? null
-              : isBooked
-                  ? () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'This time slot is already booked for this therapist'),
-                          duration: Duration(seconds: 3),
-                        ),
-                      )
-                  : () => widget.onTimeSelected(slot),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: borderColor),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+  Widget _buildPicker() {
+    final dateFmt = DateFormat('MMM d');
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(flex: 5, child: _ColumnHeader('Date')),
+              const Expanded(flex: 3, child: _ColumnHeader('Hour')),
+              const Expanded(flex: 3, child: _ColumnHeader('Minutes')),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: _kItemExtent * _kVisibleItems,
+            child: Stack(
               children: [
-                Text(
-                  slotKey,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: textColor,
-                    decoration: isPast
-                        ? TextDecoration.lineThrough
-                        : TextDecoration.none,
-                    decorationColor: textColor,
-                  ),
-                ),
-                if (isBooked) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Booked',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: textColor,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                // Highlighted centre row with hairlines above and below.
+                Center(
+                  child: Container(
+                    height: _kItemExtent,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      border: Border.symmetric(
+                        horizontal: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.28),
+                          width: 0.8,
+                        ),
+                      ),
                     ),
                   ),
-                ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: _Wheel(
+                        controller: _dateCtrl,
+                        itemCount: _dates.length,
+                        onChanged: (i) => setState(() => _dateIndex = i),
+                        onSettled: _normalize,
+                        itemBuilder: (i) {
+                          final d = _dates[i];
+                          return _DateItem(
+                            label: _dayLabel(d),
+                            date: '${dateFmt.format(d)}${_ordinal(d.day)}',
+                            selected: i == _dateIndex,
+                          );
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: _Wheel(
+                        controller: _hourCtrl,
+                        itemCount: _lastHour - _firstHour + 1,
+                        onChanged: (i) =>
+                            setState(() => _hour = _firstHour + i),
+                        onSettled: _normalize,
+                        itemBuilder: (i) {
+                          final h = _firstHour + i;
+                          return _ValueItem(
+                            text: h.toString().padLeft(2, '0'),
+                            selected: h == _hour,
+                            enabled: _hourEnabled(h),
+                          );
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: _Wheel(
+                        controller: _minuteCtrl,
+                        itemCount: _minutes.length,
+                        onChanged: (i) => setState(() => _minute = _minutes[i]),
+                        onSettled: _normalize,
+                        itemBuilder: (i) {
+                          final m = _minutes[i];
+                          return _ValueItem(
+                            text: m.toString().padLeft(2, '0'),
+                            selected: m == _minute,
+                            enabled: _minuteEnabled(m),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+    );
+  }
+
+  String _dayLabel(DateTime d) {
+    final offset = d.difference(_todayWib()).inDays;
+    if (offset == 0) return 'TODAY';
+    if (offset == 1) return 'TOMORROW';
+    return DateFormat('EEEE').format(d).toUpperCase();
+  }
+
+  static DateTime _todayWib() {
+    final n = WIB.now();
+    return DateTime.utc(n.year, n.month, n.day);
+  }
+
+  static String _ordinal(int day) {
+    if (day >= 11 && day <= 13) return 'th';
+    return switch (day % 10) {
+      1 => 'st',
+      2 => 'nd',
+      3 => 'rd',
+      _ => 'th',
+    };
+  }
+
+  void _onContinue() {
+    // The minimum may have moved while the user was deciding.
+    final picked = _selectedWib;
+    _onTick();
+    if (_selectedWib != picked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That time has passed — moved to the earliest slot.'),
+        ),
+      );
+      return;
+    }
+
+    final scheduledAtUtc = WIB.wibToUtc(_selectedWib);
+    debugPrint(
+      'Schedule picked: ${DateFormat('y-MM-dd HH:mm').format(_selectedWib)} '
+      'WIB → $scheduledAtUtc',
+    );
+    ref.read(bookingCartProvider.notifier).selectSchedule(scheduledAtUtc);
+    context.push('/booking/location');
+  }
+}
+
+// ── Availability ──────────────────────────────────────────────────────────────
+
+enum _Availability {
+  free,
+  checking,
+  conflict,
+  unknown;
+
+  bool get blocksContinue => this == checking || this == conflict;
+}
+
+class _AvailabilityNote extends StatelessWidget {
+  final _Availability state;
+  final String therapistName;
+
+  const _AvailabilityNote({required this.state, required this.therapistName});
+
+  @override
+  Widget build(BuildContext context) {
+    final (IconData icon, Color color, String text) = switch (state) {
+      _Availability.free => (
+        Icons.check_circle_outline_rounded,
+        kFlowMuted,
+        '$therapistName is free at this time.',
+      ),
+      _Availability.checking => (
+        Icons.hourglass_top_rounded,
+        kFlowMuted,
+        'Checking $therapistName’s schedule…',
+      ),
+      _Availability.conflict => (
+        Icons.error_outline_rounded,
+        const Color(0xFFFFB4A8),
+        'This therapist is already booked around that time. Please choose '
+            'another time or therapist.',
+      ),
+      _Availability.unknown => (
+        Icons.info_outline_rounded,
+        kFlowMuted,
+        'Couldn’t check $therapistName’s schedule. We’ll confirm with you.',
+      ),
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text, style: flowBody(13, color: color, height: 1.35)),
+        ),
+      ],
     );
   }
 }
 
-// ── Legend dot ─────────────────────────────────────────────────────────────────
+// ── Summary banner ────────────────────────────────────────────────────────────
 
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  const _LegendDot({required this.color});
+class _SummaryBanner extends StatelessWidget {
+  final DateTime selectedWib;
+  const _SummaryBanner({required this.selectedWib});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget build(BuildContext context) {
+    return FlowCard(
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(kFlowRadius),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.5),
+                width: 0.5,
+              ),
+            ),
+            child: const Icon(
+              Icons.calendar_today_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${DateFormat('EEE, d MMM y').format(selectedWib)}'
+                  '  ·  ${DateFormat('HH:mm').format(selectedWib)} WIB',
+                  style: flowHeading(16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Book up to $_kDaysAhead days ahead. Earliest time is '
+                  '$_kLeadMinutes minutes from now.',
+                  style: flowBody(12, color: kFlowMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Wheel pieces ──────────────────────────────────────────────────────────────
+
+class _ColumnHeader extends StatelessWidget {
+  final String text;
+  const _ColumnHeader(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    textAlign: TextAlign.center,
+    style: flowBody(12, weight: FontWeight.w500, color: kFlowMuted),
+  );
+}
+
+/// One wheel column. Drags with touch or mouse, snaps to items, and reports
+/// when scrolling settles so invalid picks can be corrected.
+class _Wheel extends StatelessWidget {
+  final FixedExtentScrollController controller;
+  final int itemCount;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onSettled;
+  final Widget Function(int index) itemBuilder;
+
+  const _Wheel({
+    required this.controller,
+    required this.itemCount,
+    required this.onChanged,
+    required this.onSettled,
+    required this.itemBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        dragDevices: PointerDeviceKind.values.toSet(),
+      ),
+      child: NotificationListener<ScrollEndNotification>(
+        onNotification: (_) {
+          // Defer so the final onSelectedItemChanged lands first.
+          WidgetsBinding.instance.addPostFrameCallback((_) => onSettled());
+          return false;
+        },
+        child: ListWheelScrollView.useDelegate(
+          controller: controller,
+          itemExtent: _kItemExtent,
+          physics: const FixedExtentScrollPhysics(),
+          diameterRatio: 1.8,
+          perspective: 0.002,
+          overAndUnderCenterOpacity: 0.45,
+          onSelectedItemChanged: onChanged,
+          childDelegate: ListWheelChildBuilderDelegate(
+            childCount: itemCount,
+            builder: (context, i) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => controller.animateToItem(
+                i,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+              ),
+              child: Center(child: itemBuilder(i)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateItem extends StatelessWidget {
+  final String label;
+  final String date;
+  final bool selected;
+
+  const _DateItem({
+    required this.label,
+    required this.date,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          style: flowBody(
+            9.5,
+            weight: FontWeight.w600,
+            color: selected ? _kCream : kFlowMuted,
+          ).copyWith(letterSpacing: 1.1),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          date,
+          maxLines: 1,
+          style: selected
+              ? flowHeading(19, color: Colors.white)
+              : flowBody(14, color: Colors.white70),
+        ),
+      ],
+    );
+  }
+}
+
+class _ValueItem extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final bool enabled;
+
+  const _ValueItem({
+    required this.text,
+    required this.selected,
+    required this.enabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) {
+      return Text(
+        text,
+        style: flowBody(
+          15,
+          color: Colors.white.withValues(alpha: 0.22),
+        ).copyWith(decoration: TextDecoration.lineThrough),
       );
+    }
+    return Text(
+      text,
+      style: selected
+          ? flowHeading(24, color: Colors.white)
+          : flowBody(16, color: Colors.white70),
+    );
+  }
 }

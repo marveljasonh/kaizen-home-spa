@@ -31,6 +31,10 @@ final _signOutUseCaseProvider = Provider<SignOutUseCase>(
   (ref) => SignOutUseCase(ref.watch(authRepositoryProvider)),
 );
 
+/// True from a successful sign-up until the welcome screen's Get Started, so
+/// the router shows /welcome to new accounts only (not on a normal login).
+final justSignedUpProvider = StateProvider<bool>((ref) => false);
+
 final authNotifierProvider = NotifierProvider<AuthNotifier, AppAuthState>(
   AuthNotifier.new,
 );
@@ -59,13 +63,10 @@ class AuthNotifier extends Notifier<AppAuthState> {
     final result = await ref
         .read(_signInUseCaseProvider)
         .call(email: email, password: password);
-    result.fold(
-      (failure) => state = AuthError(failure.message),
-      (user) {
-        state = AuthAuthenticated(user);
-        NotificationService.init();
-      },
-    );
+    result.fold((failure) => state = AuthError(failure.message), (user) {
+      state = AuthAuthenticated(user);
+      NotificationService.init();
+    });
   }
 
   Future<void> signUp({
@@ -77,13 +78,12 @@ class AuthNotifier extends Notifier<AppAuthState> {
     final result = await ref
         .read(_signUpUseCaseProvider)
         .call(email: email, password: password, name: name);
-    result.fold(
-      (failure) => state = AuthError(failure.message),
-      (user) {
-        state = AuthAuthenticated(user);
-        NotificationService.init();
-      },
-    );
+    result.fold((failure) => state = AuthError(failure.message), (user) {
+      // Set before the state change the router reacts to.
+      ref.read(justSignedUpProvider.notifier).state = true;
+      state = AuthAuthenticated(user);
+      NotificationService.init();
+    });
   }
 
   /// Creates the account then immediately saves phone + gender to profiles.
@@ -108,16 +108,15 @@ class AuthNotifier extends Notifier<AppAuthState> {
         return;
       }
       // Save phone + gender to profiles before surfacing authenticated state
-      await client.from('profiles').upsert(
-        {
-          'id': user.id,
-          'full_name': name,
-          'phone': phone,
-          'gender': gender,
-          'role': 'client',
-        },
-        onConflict: 'id',
-      );
+      await client.from('profiles').upsert({
+        'id': user.id,
+        'full_name': name,
+        'phone': phone,
+        'gender': gender,
+        'role': 'client',
+      }, onConflict: 'id');
+      // Set before the state change the router reacts to.
+      ref.read(justSignedUpProvider.notifier).state = true;
       state = AuthAuthenticated(_mapUser(user));
       NotificationService.init();
     } on AuthException catch (e) {
@@ -137,19 +136,22 @@ class AuthNotifier extends Notifier<AppAuthState> {
           .select()
           .eq('id', user.id)
           .single();
-      state = AuthAuthenticated(AppUser(
-        id: user.id,
-        email: user.email ?? '',
-        name: profile['full_name'] as String?,
-        avatarUrl: profile['avatar_url'] as String?,
-        phone: profile['phone'] as String?,
-      ));
+      state = AuthAuthenticated(
+        AppUser(
+          id: user.id,
+          email: user.email ?? '',
+          name: profile['full_name'] as String?,
+          avatarUrl: profile['avatar_url'] as String?,
+          phone: profile['phone'] as String?,
+        ),
+      );
     } catch (_) {
       // Non-fatal — keep existing state
     }
   }
 
   Future<void> signOut() async {
+    ref.read(justSignedUpProvider.notifier).state = false;
     state = const AuthLoading();
     final result = await ref.read(_signOutUseCaseProvider).call();
     result.fold(
@@ -159,10 +161,10 @@ class AuthNotifier extends Notifier<AppAuthState> {
   }
 
   AppUser _mapUser(User user) => AppUser(
-        id: user.id,
-        email: user.email ?? '',
-        name: user.userMetadata?['name'] as String?,
-        avatarUrl: user.userMetadata?['avatar_url'] as String?,
-        phone: user.phone,
-      );
+    id: user.id,
+    email: user.email ?? '',
+    name: user.userMetadata?['name'] as String?,
+    avatarUrl: user.userMetadata?['avatar_url'] as String?,
+    phone: user.phone,
+  );
 }

@@ -44,7 +44,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       );
       return;
     }
-    await ref.read(authNotifierProvider.notifier).signUpAndSaveProfile(
+    await ref
+        .read(authNotifierProvider.notifier)
+        .signUpAndSaveProfile(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -151,9 +153,8 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
                         ),
-                        onPressed: () => setState(
-                          () => _obscureConfirm = !_obscureConfirm,
-                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                       validator: (v) {
                         if (v != _passwordController.text) {
@@ -184,8 +185,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     // ── Gender selection ──────────────────────────────────────
                     Text(
                       'Gender',
-                      style: AppTypography.labelMedium
-                          .copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.labelMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -309,10 +311,8 @@ class _GenderChip extends StatelessWidget {
               Text(
                 label,
                 style: AppTypography.labelMedium.copyWith(
-                  color:
-                      selected ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight:
-                      selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ],
@@ -334,8 +334,10 @@ class _Header extends StatelessWidget {
       children: [
         GestureDetector(
           onTap: () => context.go('/auth/login'),
-          child: Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary),
+          child: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 24),
         Text(

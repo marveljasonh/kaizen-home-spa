@@ -43,10 +43,12 @@ class AuthTextField extends StatelessWidget {
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: AppColors.surface,
-        labelStyle: AppTypography.labelMedium
-            .copyWith(color: AppColors.textSecondary),
-        hintStyle:
-            AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
+        labelStyle: AppTypography.labelMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+        hintStyle: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textMuted,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),
@@ -65,8 +67,7 @@ class AuthTextField extends StatelessWidget {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

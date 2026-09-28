@@ -48,7 +48,7 @@ dependencies:
   google_sign_in: ^7.2.0
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
-  google_fonts: ^6.1.0
+  google_fonts: ^6.2.1
   smooth_page_indicator: ^2.0.1
   flutter_rating_bar: ^4.0.1
   table_calendar: ^3.2.0
@@ -62,6 +62,7 @@ dependencies:
   dartz: ^0.10.1
   equatable: ^2.0.8
   freezed_annotation: ^3.1.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -87,6 +88,27 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: CalSans
+      fonts:
+        - asset: assets/fonts/CalSans-SemiBold.ttf
+          weight: 600
+    - family: Florian
+      fonts:
+        - asset: assets/fonts/Florian-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Florian-Bold.otf
+          weight: 700
+        - asset: assets/fonts/Florian-Black.otf
+          weight: 900
+
+  assets:
+    - assets/images/home/
+    - assets/images/treatments/
+    - assets/images/promo/
+    - assets/images/splash/
+    - assets/icons/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

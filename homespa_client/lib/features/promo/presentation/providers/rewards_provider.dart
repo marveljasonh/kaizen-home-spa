@@ -12,8 +12,10 @@ final clientTotalPointsProvider = FutureProvider<int>((ref) async {
       .select('points_earned')
       .eq('client_id', userId);
 
-  return (data as List)
-      .fold<int>(0, (sum, row) => sum + (row['points_earned'] as int));
+  return (data as List).fold<int>(
+    0,
+    (sum, row) => sum + (row['points_earned'] as int),
+  );
 });
 
 final rewardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -29,8 +31,9 @@ final rewardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return List<Map<String, dynamic>>.from(data);
 });
 
-final myRedemptionsProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final myRedemptionsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   debugPrint('myRedemptionsProvider userId: $userId');
   if (userId == null) return [];
@@ -49,13 +52,15 @@ final myRedemptionsProvider =
 
   debugPrint('myRedemptionsProvider data: ${data.length} items');
   debugPrint(
-      'myRedemptionsProvider first: ${data.isNotEmpty ? data.first : 'empty'}');
+    'myRedemptionsProvider first: ${data.isNotEmpty ? data.first : 'empty'}',
+  );
 
   return List<Map<String, dynamic>>.from(data);
 });
 
-final clientVouchersProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final clientVouchersProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) return [];
   final data = await Supabase.instance.client

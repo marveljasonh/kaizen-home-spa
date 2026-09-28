@@ -19,10 +19,14 @@ class TherapistModel extends Therapist {
     return TherapistModel(
       id: json['id'] as String,
       // preferred_therapist queries return full_name from profiles; fall back to name for legacy use
-      name: json['full_name'] as String? ?? json['name'] as String? ?? 'Therapist',
+      name:
+          json['full_name'] as String? ??
+          json['name'] as String? ??
+          'Therapist',
       bio: json['bio'] as String?,
       avatarUrl: json['avatar_url'] as String?,
-      rating: (json['rating_avg'] as num?)?.toDouble() ??
+      rating:
+          (json['rating_avg'] as num?)?.toDouble() ??
           (json['rating'] as num?)?.toDouble() ??
           0.0,
       reviewCount: json['review_count'] as int? ?? 0,

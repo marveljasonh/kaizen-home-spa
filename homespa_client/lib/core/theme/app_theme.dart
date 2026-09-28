@@ -6,36 +6,37 @@ import 'app_typography.dart';
 
 abstract final class AppTheme {
   static ThemeData get light {
-    final colorScheme = const ColorScheme.light(
-      primary: AppColors.primary,
-      primaryContainer: AppColors.primaryLight,
-      onPrimary: Colors.white,
-      onPrimaryContainer: AppColors.primary,
-      secondary: AppColors.secondary,
-      secondaryContainer: AppColors.primaryLight,
-      onSecondary: Colors.white,
-      onSecondaryContainer: AppColors.primary,
-      tertiary: AppColors.gold,
-      tertiaryContainer: AppColors.goldLight,
-      onTertiary: Colors.white,
-      onTertiaryContainer: AppColors.goldDark,
-      surface: AppColors.background,
-      onSurface: AppColors.textPrimary,
-      onSurfaceVariant: AppColors.textSecondary,
-      outline: AppColors.border,
-      outlineVariant: AppColors.border,
-      error: Color(0xFFD32F2F),
-      inverseSurface: AppColors.secondary,
-      onInverseSurface: Colors.white,
-      inversePrimary: AppColors.primaryLight,
-    ).copyWith(
-      surfaceContainer: AppColors.surface,
-      surfaceContainerHigh: AppColors.surfaceVariant,
-      surfaceContainerHighest: const Color(0xFFE5DDD0),
-      surfaceContainerLow: AppColors.background,
-      surfaceContainerLowest: AppColors.background,
-      surfaceTint: Colors.transparent,
-    );
+    final colorScheme =
+        const ColorScheme.light(
+          primary: AppColors.primary,
+          primaryContainer: AppColors.primaryLight,
+          onPrimary: Colors.white,
+          onPrimaryContainer: AppColors.primary,
+          secondary: AppColors.secondary,
+          secondaryContainer: AppColors.primaryLight,
+          onSecondary: Colors.white,
+          onSecondaryContainer: AppColors.primary,
+          tertiary: AppColors.gold,
+          tertiaryContainer: AppColors.goldLight,
+          onTertiary: Colors.white,
+          onTertiaryContainer: AppColors.goldDark,
+          surface: AppColors.background,
+          onSurface: AppColors.textPrimary,
+          onSurfaceVariant: AppColors.textSecondary,
+          outline: AppColors.border,
+          outlineVariant: AppColors.border,
+          error: Color(0xFFD32F2F),
+          inverseSurface: AppColors.secondary,
+          onInverseSurface: Colors.white,
+          inversePrimary: AppColors.primaryLight,
+        ).copyWith(
+          surfaceContainer: AppColors.surface,
+          surfaceContainerHigh: AppColors.surfaceVariant,
+          surfaceContainerHighest: const Color(0xFFE5DDD0),
+          surfaceContainerLow: AppColors.background,
+          surfaceContainerLowest: AppColors.background,
+          surfaceTint: Colors.transparent,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -49,8 +50,9 @@ abstract final class AppTheme {
         scrolledUnderElevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle:
-            AppTypography.headingSmall.copyWith(color: AppColors.textPrimary),
+        titleTextStyle: AppTypography.headingSmall.copyWith(
+          color: AppColors.textPrimary,
+        ),
         centerTitle: false,
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -107,8 +109,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),
@@ -119,8 +123,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -128,13 +131,14 @@ abstract final class AppTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
         ),
-        hintStyle:
-            AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
-        labelStyle:
-            AppTypography.labelMedium.copyWith(color: AppColors.textSecondary),
+        hintStyle: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textMuted,
+        ),
+        labelStyle: AppTypography.labelMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surface,
@@ -153,42 +157,55 @@ abstract final class AppTheme {
         selectedColor: AppColors.primary,
         side: const BorderSide(color: AppColors.border),
         labelStyle: AppTypography.labelMedium,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
       textTheme: TextTheme(
-        displayLarge: AppTypography.displayLarge
-            .copyWith(color: AppColors.textPrimary),
-        displayMedium: AppTypography.displayLarge
-            .copyWith(color: AppColors.textPrimary),
-        displaySmall: AppTypography.headingLarge
-            .copyWith(color: AppColors.textPrimary),
-        headlineLarge: AppTypography.headingLarge
-            .copyWith(color: AppColors.textPrimary),
-        headlineMedium: AppTypography.headingMedium
-            .copyWith(color: AppColors.textPrimary),
-        headlineSmall: AppTypography.headingSmall
-            .copyWith(color: AppColors.textPrimary),
-        titleLarge: AppTypography.headingSmall
-            .copyWith(color: AppColors.textPrimary),
-        titleMedium: AppTypography.labelLarge
-            .copyWith(color: AppColors.textPrimary),
-        titleSmall: AppTypography.labelMedium
-            .copyWith(color: AppColors.textPrimary),
-        bodyLarge:
-            AppTypography.bodyLarge.copyWith(color: AppColors.textPrimary),
-        bodyMedium:
-            AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
-        bodySmall: AppTypography.bodySmall
-            .copyWith(color: AppColors.textSecondary),
-        labelLarge: AppTypography.labelLarge
-            .copyWith(color: AppColors.textPrimary),
-        labelMedium: AppTypography.labelMedium
-            .copyWith(color: AppColors.textSecondary),
-        labelSmall:
-            AppTypography.labelSmall.copyWith(color: AppColors.textMuted),
+        displayLarge: AppTypography.displayLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        displayMedium: AppTypography.displayLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        displaySmall: AppTypography.headingLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        headlineLarge: AppTypography.headingLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        headlineMedium: AppTypography.headingMedium.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        headlineSmall: AppTypography.headingSmall.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        titleLarge: AppTypography.headingSmall.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        titleMedium: AppTypography.labelLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        titleSmall: AppTypography.labelMedium.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        bodyLarge: AppTypography.bodyLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        bodyMedium: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        bodySmall: AppTypography.bodySmall.copyWith(
+          color: AppColors.textSecondary,
+        ),
+        labelLarge: AppTypography.labelLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        labelMedium: AppTypography.labelMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+        labelSmall: AppTypography.labelSmall.copyWith(
+          color: AppColors.textMuted,
+        ),
       ),
     );
   }

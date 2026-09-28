@@ -16,5 +16,11 @@ class TreatmentDuration extends Equatable {
   });
 
   @override
-  List<Object?> get props => [id, treatmentId, durationMinutes, price, isDefault];
+  List<Object?> get props => [
+    id,
+    treatmentId,
+    durationMinutes,
+    price,
+    isDefault,
+  ];
 }

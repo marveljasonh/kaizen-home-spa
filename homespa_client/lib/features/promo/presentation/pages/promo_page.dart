@@ -1,16 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:go_router/go_router.dart';
-
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/flow_widgets.dart';
+import '../../../../core/widgets/kaizen_page.dart';
 import '../../../booking/presentation/providers/booking_cart.dart';
 import '../../../promo/domain/entities/promo_banner.dart';
+import '../../../treatments/presentation/widgets/glass_icon_button.dart';
 import '../providers/promo_providers.dart';
 import '../providers/rewards_provider.dart';
+
+// Promos / Vouchers (Promo tab). Hero from Figma kaizen › promo (1650:2679):
+// spa photo under a clear → black gradient with 40px bottom corners, glass
+// filter + search buttons, History-style tab pills; glass cards on the
+// #434930 page, CalSans titles and Montserrat body text.
+
+const String _kIconSearch = 'assets/icons/search_24.svg'; // Icon/Search/24
+const String _kIconFilter = 'assets/icons/filter_49.svg'; // Frame 33620
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+const double _kGutterLeft = 30;
+const double _kGutterRight = 31; // tabs and search end at x 371 of 402
+const double _kCardGap = 14;
+
+// ── Hero (Figma 1650:2680 – 1650:2695) ───────────────────────────────────────
+const double _kHeroHeight = 219;
+const double _kLabelTop = 76.99; // "Promos"
+const double _kTitleTop = 102.88; // "Vouchers"
+const double _kHeaderButtonsTop = 72;
+
+/// Filter ends at x 306, search starts at x 322.
+const double _kHeaderButtonGap = 16;
+
+/// Filter export is 50.4913 square: the 49px circle plus its outside stroke.
+const double _kFilterSvgSize = 50.4913;
+const double _kFilterSvgInset = -0.745637;
+const double _kTabsTop = 143;
+const double _kTabHeight = 46;
+const double _kTabGap = 13.179; // 193.911 → 207.09
+const double _kTabLabelTop = 11; // label y 154 in a tab at y 143
+const double _kTabLabelHeight = 20;
+
+/// Search field that opens under the hero: 16 gap + 48 field.
+const double _kSearchGap = 16;
+const double _kSearchHeight = 48;
+
+// ── Special Offers (Figma kaizen › promo, node 1650:2747) ────────────────────
+// Banners: 222.129 × 146.2, radius 5.095, photo under a clear → 83% black
+// gradient; title and subtitle 18.11 in from the left, 13.7 up from the bottom.
+const double _kPromosTop = 20; // hero bottom 219 → section title 239
+const double _kOffersTitleToBanners =
+    14.675; // subtitle bottom 284.825 → banner 299.5
+const double _kOffersToNext = 20.3; // banner bottom 445.7 → My Vouchers 466
+const double _kBannerWidth = 222.129;
+const double _kBannerHeight = 146.2;
+const double _kBannerGap = 13; // second banner at x 265.13
+const double _kBannerRadius = 5.095; // Home card corners
+const double _kBannerTextLeft = 18.11; // text x 48.11 on a banner at x 30
+const double _kBannerTextRight = 25.19; // subtitle box 178.935 wide
+const double _kBannerTextBottom = 13.7; // subtitle bottom 432 → banner 445.7
+const String _kBannerFallbackImage = 'assets/images/promo/special_offer_bg.png';
+
+/// Order card corners (4.603 at 222 wide) at the 341 History width.
+const double _kCardRadius = 4.603 * 341 / 222;
+
+/// "#CODE" tag corners (3.32 at 222 wide) at the 341 History width.
+const double _kTagRadius = 3.32 * 341 / 222;
+const double _kButtonRadius = 10;
+const double _kPillHeight = 44;
+
+/// Point & Rewards content starts 25 below the hero.
+const double _kRewardsTop = 25;
+
+const Color _kPillOlive = AppColors.darkOliveLight; // #4E523B
+const Color _kGold = AppColors.gold;
+const Color _kMuted = AppColors.textOnDarkMuted;
+const Color _kActive = Color(0xFF74D38E);
+const Color _kExpired = Color(0xFFFF7B6E);
 
 class PromoPage extends ConsumerStatefulWidget {
   const PromoPage({super.key});
@@ -23,27 +95,83 @@ class _PromoPageState extends ConsumerState<PromoPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+  /// One per tab, so the hero scrolls away with whichever list is showing.
+  final _promosScroll = ScrollController();
+  final _rewardsScroll = ScrollController();
+
   final _codeController = TextEditingController();
   bool _isApplying = false;
   String? _applyError;
 
+  final _searchController = TextEditingController();
+  bool _searching = false;
+  String _query = '';
+
+  /// Filter sheet: hide used/expired vouchers and rewards, and rewards the
+  /// client can't afford yet.
+  bool _onlyUsable = false;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: ref.read(promoTabRequestProvider) ?? 0,
+    );
+    // Cleared after the first frame (providers can't be modified mid-build).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(promoTabRequestProvider.notifier).state = null;
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _promosScroll.dispose();
+    _rewardsScroll.dispose();
     _codeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
+  void _toggleSearch() => setState(() {
+    _searching = !_searching;
+    if (!_searching) {
+      _searchController.clear();
+      _query = '';
+    }
+  });
+
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSheet(onlyUsable: _onlyUsable),
+    );
+    if (result != null && mounted) setState(() => _onlyUsable = result);
+  }
+
+  /// Case-insensitive match on any of [fields]; everything matches when the
+  /// search is empty.
+  bool _matches(Iterable<String?> fields) {
+    if (_query.isEmpty) return true;
+    final q = _query.toLowerCase();
+    return fields.any((f) => f != null && f.toLowerCase().contains(q));
+  }
+
+  double get _contentTop =>
+      _kHeroHeight + (_searching ? _kSearchGap + _kSearchHeight : 0);
+
+  /// Saves the code to My Vouchers. Never applies it to the cart — that
+  /// happens on the voucher step during booking.
   Future<void> _applyCode() async {
     final code = _codeController.text.trim().toUpperCase();
     if (code.isEmpty) return;
-    setState(() { _isApplying = true; _applyError = null; });
+    setState(() {
+      _isApplying = true;
+      _applyError = null;
+    });
 
     try {
       final voucher = await Supabase.instance.client
@@ -65,16 +193,18 @@ class _PromoPageState extends ConsumerState<PromoPage>
 
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId != null) {
-        await Supabase.instance.client.from('client_vouchers').upsert(
-          {'client_id': userId, 'voucher_id': voucher['id']},
-          onConflict: 'client_id,voucher_id',
-        );
+        await Supabase.instance.client.from('client_vouchers').upsert({
+          'client_id': userId,
+          'voucher_id': voucher['id'],
+        }, onConflict: 'client_id,voucher_id');
       }
 
       _codeController.clear();
       ref.invalidate(clientVouchersProvider);
       if (!mounted) return;
-      setState(() { _isApplying = false; });
+      setState(() {
+        _isApplying = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Voucher saved to My Vouchers!'),
@@ -111,23 +241,34 @@ class _PromoPageState extends ConsumerState<PromoPage>
 
   Future<void> _useReward(Map<String, dynamic> redemption) async {
     debugPrint('[UseReward] full redemption data: ${redemption.toString()}');
-    debugPrint('[UseReward] reward type: ${redemption['rewards']?['reward_type']}');
-    debugPrint('[UseReward] reward_treatment_id: ${redemption['rewards']?['reward_treatment_id']}');
-    debugPrint('[UseReward] reward_duration: ${redemption['rewards']?['reward_duration']}');
+    debugPrint(
+      '[UseReward] reward type: ${redemption['rewards']?['reward_type']}',
+    );
+    debugPrint(
+      '[UseReward] reward_treatment_id: ${redemption['rewards']?['reward_treatment_id']}',
+    );
+    debugPrint(
+      '[UseReward] reward_duration: ${redemption['rewards']?['reward_duration']}',
+    );
 
     final reward = (redemption['rewards'] as Map<String, dynamic>?) ?? {};
     final rewardType = (reward['reward_type'] as String?) ?? '';
     final rewardTitle = (reward['title'] as String?) ?? 'Reward';
-    final rewardValue = (reward['reward_value'] as num?)?.toInt() ?? 0;
 
     debugPrint('[UseReward] parsed rewardType: $rewardType');
     debugPrint('[UseReward] parsed rewardTitle: $rewardTitle');
 
     if (rewardType == 'free_treatment') {
       final durationMinutes =
-          (reward['reward_duration'] as Map<String, dynamic>?)?['duration_minutes'] as int? ?? 0;
+          (reward['reward_duration']
+                  as Map<String, dynamic>?)?['duration_minutes']
+              as int? ??
+          0;
       if (!mounted) return;
-      ref.read(bookingCartProvider.notifier).applyFreeReward(
+      // Marked used only when the booking is confirmed.
+      ref
+          .read(bookingCartProvider.notifier)
+          .applyFreeReward(
             redemption['id'] as String,
             rewardTitle,
             treatmentId: reward['reward_treatment_id'] as String?,
@@ -141,212 +282,284 @@ class _PromoPageState extends ConsumerState<PromoPage>
     }
   }
 
+  Future<void> _refreshPromos() async {
+    ref.invalidate(bannersProvider);
+    ref.invalidate(myRedemptionsProvider);
+    ref.invalidate(clientVouchersProvider);
+    try {
+      await Future.wait([
+        ref.read(bannersProvider.future),
+        ref.read(myRedemptionsProvider.future),
+        ref.read(clientVouchersProvider.future),
+      ]);
+    } catch (_) {
+      // Each section shows its own error/empty state.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bannersAsync = ref.watch(bannersProvider);
-    final redemptionsAsync = ref.watch(myRedemptionsProvider);
-    final promoVouchersAsync = ref.watch(clientVouchersProvider);
+    // Another page asked for a tab while this one was already built.
+    ref.listen<int?>(promoTabRequestProvider, (_, tab) {
+      if (tab == null) return;
+      _tabController.animateTo(tab);
+      ref.read(promoTabRequestProvider.notifier).state = null;
+    });
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(
-          'Promos & Vouchers',
-          style: AppTypography.headingMedium
-              .copyWith(color: AppColors.textPrimary),
-        ),
-        centerTitle: false,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle:
-              AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700),
-          tabs: const [
-            Tab(text: 'Promos'),
-            Tab(text: 'Point & Rewards'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // ── Tab 1: Promos ─────────────────────────────────────────────────
-          RefreshIndicator(
-            color: AppColors.primary,
-            backgroundColor: AppColors.surface,
-            onRefresh: () async {
-              ref.invalidate(bannersProvider);
-              ref.invalidate(myRedemptionsProvider);
-              ref.invalidate(clientVouchersProvider);
-            },
-            child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              // ── Special Offers ────────────────────────────────────────────
-              _SectionHeader(label: 'SPECIAL OFFERS'),
-              bannersAsync.when(
-                loading: () => _BannerSkeleton(),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (banners) => banners.isEmpty
-                    ? _EmptyBanners()
-                    : _BannerCarousel(banners: banners),
-              ),
-
-              const SizedBox(height: 8),
-
-              // ── Enter Promo Code ──────────────────────────────────────────
-              _SectionHeader(label: 'ENTER PROMO CODE'),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.darkOlive, // #434930
+        // Layered hero (as on History): each tab's list scrolls under the
+        // hero, and the hero moves up with the list that is showing.
+        body: Stack(
+          children: [
+            TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPromosTab(),
+                _PointsRewardsTab(
+                  controller: _rewardsScroll,
+                  topPadding: _contentTop + _kRewardsTop,
+                  onlyAffordable: _onlyUsable,
+                  matches: _matches,
+                  query: _query,
+                  onRedeemed: _onRewardRedeemed,
+                ),
+              ],
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  _tabController,
+                  _promosScroll,
+                  _rewardsScroll,
+                ]),
+                builder: (context, child) {
+                  final scroll = _tabController.index == 0
+                      ? _promosScroll
+                      : _rewardsScroll;
+                  final offset = scroll.hasClients ? scroll.offset : 0.0;
+                  return Transform.translate(
+                    offset: Offset(0, -offset.clamp(0.0, _contentTop + 40)),
+                    child: child,
+                  );
+                },
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _codeController,
-                            textCapitalization: TextCapitalization.characters,
-                            onSubmitted: (_) => _applyCode(),
-                            decoration: InputDecoration(
-                              hintText: 'e.g. KAIZEN20',
-                              errorText: _applyError,
-                              filled: true,
-                              fillColor: AppColors.surfaceVariant
-                                  .withValues(alpha: 0.4),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: AppColors.border
-                                        .withValues(alpha: 0.3)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: AppColors.primary, width: 1.5),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                    color: Color(0xFFD32F2F)),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
+                    SizedBox(
+                      height: _kHeroHeight,
+                      child: Stack(
+                        children: [
+                          const Positioned.fill(
+                            child: KaizenHeroBackground(height: _kHeroHeight),
+                          ),
+                          ListenableBuilder(
+                            listenable: _tabController,
+                            builder: (context, _) => _HeroContent(
+                              activeIndex: _tabController.index,
+                              onTab: _tabController.animateTo,
+                              onSearch: _toggleSearch,
+                              onFilter: _openFilters,
+                              activeFilterCount: _onlyUsable ? 1 : 0,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton(
-                          onPressed: _isApplying ? null : _applyCode,
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: _isApplying
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Apply',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    if (_searching)
+                      _SearchField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _query = v.trim()),
+                        onClose: _toggleSearch,
+                      ),
                   ],
                 ),
               ),
-
-              // ── My Vouchers ───────────────────────────────────────────────
-              _SectionHeader(label: 'MY VOUCHERS'),
-              promoVouchersAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (promoVouchers) {
-                  if (promoVouchers.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                      child: Text(
-                        'Enter a promo code above to save vouchers here.',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.textMuted),
-                      ),
-                    );
-                  }
-                  return Column(
-                    children: promoVouchers.map((cv) {
-                      final v = (cv['voucher'] as Map<String, dynamic>?) ?? {};
-                      final code = (v['code'] as String?) ?? '';
-                      return _PromoVoucherCard(
-                        data: cv,
-                        onUse: code.isNotEmpty ? () => _usePromoVoucher(code) : null,
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-
-              // ── My Rewards ────────────────────────────────────────────────
-              _SectionHeader(label: 'MY REWARDS'),
-              redemptionsAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (rewardRedemptions) {
-                  if (rewardRedemptions.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                      child: Text(
-                        'Redeem points in the Point & Rewards tab to see your rewards here.',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.textMuted),
-                      ),
-                    );
-                  }
-                  return Column(
-                    children: [
-                      ...rewardRedemptions.map((r) => _VoucherRedemptionCard(
-                        data: r,
-                        onUse: () => _useReward(r),
-                      )),
-                      const SizedBox(height: 24),
-                    ],
-                  );
-                },
-              ),
-            ],
             ),
-          ),
-
-          // ── Tab 2: Point & Rewards ────────────────────────────────────────
-          _PointsRewardsTab(onRedeemed: _onRewardRedeemed),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  Widget _buildPromosTab() {
+    final bannersAsync = ref.watch(bannersProvider);
+    final redemptionsAsync = ref.watch(myRedemptionsProvider);
+    final vouchersAsync = ref.watch(clientVouchersProvider);
+
+    // Special Offers is hidden when there is nothing to promote — an empty
+    // banner slot is just noise. The other sections show an empty state.
+    final banners = (bannersAsync.value ?? const <PromoBanner>[])
+        .where((b) => _matches([b.title, b.subtitle]))
+        .toList();
+    final showOffers =
+        (bannersAsync.isLoading && _query.isEmpty) || banners.isNotEmpty;
+
+    return _RefreshList(
+      controller: _promosScroll,
+      onRefresh: _refreshPromos,
+      topPadding: _contentTop + _kPromosTop,
+      children: [
+        if (showOffers) ...[
+          const _SectionHeader(
+            title: 'Special Offers',
+            subtitle: 'Limited-time deals from Kaizen Home Spa',
+            bottomGap: _kOffersTitleToBanners,
+          ),
+          _BannerList(
+            banners: banners,
+            loading: bannersAsync.isLoading && banners.isEmpty,
+          ),
+          const SizedBox(height: _kOffersToNext),
+        ],
+
+        // ── My Vouchers ────────────────────────────────────────────────────
+        const _SectionHeader(
+          title: 'My Vouchers',
+          subtitle: 'Promo codes saved to your account',
+        ),
+        _Gutter(
+          _PromoCodeField(
+            controller: _codeController,
+            error: _applyError,
+            isSaving: _isApplying,
+            onSave: _applyCode,
+          ),
+        ),
+        const SizedBox(height: _kCardGap),
+        ...vouchersAsync.when(
+          loading: () => const [_CardSkeleton()],
+          error: (_, _) => const [
+            _EmptySection(
+              icon: Icons.cloud_off_rounded,
+              message: 'We couldn’t load your vouchers. Pull to refresh.',
+            ),
+          ],
+          data: (all) {
+            final vouchers = all.where((cv) {
+              final v = (cv['voucher'] as Map<String, dynamic>?) ?? {};
+              return (!_onlyUsable || _isVoucherUsable(cv)) &&
+                  _matches([v['code'] as String?, v['description'] as String?]);
+            }).toList();
+            if (all.isEmpty) {
+              return const [
+                _EmptySection(
+                  icon: Icons.local_offer_outlined,
+                  message: 'Enter a promo code above to save vouchers here.',
+                ),
+              ];
+            }
+            if (vouchers.isEmpty) {
+              return [
+                _EmptySection(
+                  icon: Icons.search_off_rounded,
+                  message: _noMatchMessage('vouchers'),
+                ),
+              ];
+            }
+            return [
+              for (final cv in vouchers) ...[
+                _Gutter(
+                  _VoucherCard(
+                    data: cv,
+                    onUse: (code) => _usePromoVoucher(code),
+                  ),
+                ),
+                const SizedBox(height: _kCardGap),
+              ],
+            ];
+          },
+        ),
+        const SizedBox(height: 14),
+
+        // ── My Rewards ─────────────────────────────────────────────────────
+        const _SectionHeader(
+          title: 'My Rewards',
+          subtitle: 'Rewards you’ve redeemed with points',
+        ),
+        ...redemptionsAsync.when(
+          loading: () => const [_CardSkeleton()],
+          error: (_, _) => const [
+            _EmptySection(
+              icon: Icons.cloud_off_rounded,
+              message: 'We couldn’t load your rewards. Pull to refresh.',
+            ),
+          ],
+          data: (all) {
+            final redemptions = all.where((r) {
+              final reward = (r['rewards'] as Map<String, dynamic>?) ?? {};
+              return (!_onlyUsable || r['is_used'] != true) &&
+                  _matches([reward['title'] as String?]);
+            }).toList();
+            if (all.isEmpty) {
+              return const [
+                _EmptySection(
+                  icon: Icons.card_giftcard_rounded,
+                  message:
+                      'Redeem points in Point & Rewards to see your rewards here.',
+                ),
+              ];
+            }
+            if (redemptions.isEmpty) {
+              return [
+                _EmptySection(
+                  icon: Icons.search_off_rounded,
+                  message: _noMatchMessage('rewards'),
+                ),
+              ];
+            }
+            return [
+              for (final r in redemptions) ...[
+                _Gutter(_RedemptionCard(data: r, onUse: () => _useReward(r))),
+                const SizedBox(height: _kCardGap),
+              ],
+            ];
+          },
+        ),
+      ],
+    );
+  }
+
+  String _noMatchMessage(String what) => _query.isNotEmpty
+      ? 'No $what match “$_query”.'
+      : 'No usable $what right now.';
 }
 
-// ── Point & Rewards tab ────────────────────────────────────────────────────────
+/// Same rules as [_VoucherCard]: not used and not past its expiry.
+bool _isVoucherUsable(Map<String, dynamic> cv) {
+  final v = (cv['voucher'] as Map<String, dynamic>?) ?? {};
+  final expiryRaw = (v['expires_at'] ?? v['valid_until']) as String?;
+  final expiry = expiryRaw == null ? null : DateTime.tryParse(expiryRaw);
+  final isExpired = expiry?.isBefore(DateTime.now()) ?? false;
+  final isUsed = cv['is_used'] == true || cv['used_at'] != null;
+  return !isUsed && !isExpired;
+}
+
+// ── Point & Rewards tab ───────────────────────────────────────────────────────
 
 class _PointsRewardsTab extends ConsumerStatefulWidget {
+  final ScrollController controller;
+  final double topPadding;
+
+  /// Filter sheet: only rewards the client has enough points for.
+  final bool onlyAffordable;
+  final bool Function(Iterable<String?> fields) matches;
+  final String query;
   final VoidCallback onRedeemed;
-  const _PointsRewardsTab({required this.onRedeemed});
+
+  const _PointsRewardsTab({
+    required this.controller,
+    required this.topPadding,
+    required this.onlyAffordable,
+    required this.matches,
+    required this.query,
+    required this.onRedeemed,
+  });
 
   @override
   ConsumerState<_PointsRewardsTab> createState() => _PointsRewardsTabState();
@@ -364,9 +577,12 @@ class _PointsRewardsTabState extends ConsumerState<_PointsRewardsTab> {
         'points_spent': reward['points_required'],
       });
 
-      await Supabase.instance.client.from('rewards').update({
-        'total_redeemed': ((reward['total_redeemed'] as int?) ?? 0) + 1,
-      }).eq('id', reward['id']);
+      await Supabase.instance.client
+          .from('rewards')
+          .update({
+            'total_redeemed': ((reward['total_redeemed'] as int?) ?? 0) + 1,
+          })
+          .eq('id', reward['id']);
 
       // Deduct points by inserting a negative entry
       await Supabase.instance.client.from('client_points').insert({
@@ -393,153 +609,1096 @@ class _PointsRewardsTabState extends ConsumerState<_PointsRewardsTab> {
     widget.onRedeemed();
   }
 
+  Future<void> _refresh() async {
+    ref.invalidate(clientTotalPointsProvider);
+    ref.invalidate(rewardsProvider);
+    try {
+      await Future.wait([
+        ref.read(clientTotalPointsProvider.future),
+        ref.read(rewardsProvider.future),
+      ]);
+    } catch (_) {
+      // Shown inline below.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pointsAsync = ref.watch(clientTotalPointsProvider);
     final rewardsAsync = ref.watch(rewardsProvider);
-
     final totalPoints = pointsAsync.maybeWhen(data: (v) => v, orElse: () => 0);
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      backgroundColor: AppColors.surface,
-      onRefresh: () async {
-        ref.invalidate(clientTotalPointsProvider);
-        ref.invalidate(rewardsProvider);
-      },
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          // ── Points balance card ──────────────────────────────────────────
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.secondary,
-              borderRadius: BorderRadius.circular(16),
+    return _RefreshList(
+      controller: widget.controller,
+      onRefresh: _refresh,
+      topPadding: widget.topPadding,
+      children: [
+        _Gutter(
+          _PointsBalanceCard(
+            points: totalPoints,
+            loading: pointsAsync.isLoading && !pointsAsync.hasValue,
+          ),
+        ),
+        const SizedBox(height: 28),
+        const _SectionHeader(
+          title: 'Available Rewards',
+          subtitle: 'Spend your points on treatments and discounts',
+        ),
+        ...rewardsAsync.when(
+          loading: () => const [_CardSkeleton(), _CardSkeleton()],
+          error: (e, _) => [
+            const _EmptySection(
+              icon: Icons.cloud_off_rounded,
+              message: 'We couldn’t load rewards. Pull to refresh.',
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.goldLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.stars_rounded,
-                      color: AppColors.goldDark, size: 28),
+          ],
+          data: (all) {
+            final rewards = all.where((r) {
+              final needed = (r['points_required'] as int?) ?? 0;
+              return (!widget.onlyAffordable || totalPoints >= needed) &&
+                  widget.matches([
+                    r['title'] as String?,
+                    r['description'] as String?,
+                  ]);
+            }).toList();
+            if (all.isEmpty) {
+              return const [
+                _EmptySection(
+                  icon: Icons.card_giftcard_rounded,
+                  message: 'No rewards available yet.',
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'YOUR POINTS',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$totalPoints pts',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              ];
+            }
+            if (rewards.isEmpty) {
+              return [
+                _EmptySection(
+                  icon: Icons.search_off_rounded,
+                  message: widget.query.isNotEmpty
+                      ? 'No rewards match “${widget.query}”.'
+                      : 'No rewards you can redeem yet.',
+                ),
+              ];
+            }
+            return [
+              for (final r in rewards) ...[
+                _Gutter(
+                  _RewardCard(
+                    reward: r,
+                    totalPoints: totalPoints,
+                    onRedeem: () => _redeemReward(r),
+                  ),
+                ),
+                const SizedBox(height: _kCardGap),
+              ],
+            ];
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ── Hero ──────────────────────────────────────────────────────────────────────
+
+/// Hero foreground: "Promos" / "Vouchers", filter + search, and the tabs.
+class _HeroContent extends StatelessWidget {
+  final int activeIndex;
+  final ValueChanged<int> onTab;
+  final VoidCallback onSearch;
+  final VoidCallback onFilter;
+  final int activeFilterCount;
+
+  const _HeroContent({
+    required this.activeIndex,
+    required this.onTab,
+    required this.onSearch,
+    required this.onFilter,
+    required this.activeFilterCount,
+  });
+
+  static const _tabs = ['Promos', 'Rewards'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          top: _kLabelTop,
+          left: _kGutterLeft,
+          child: Text(
+            'Promos',
+            style: GoogleFonts.montserrat(
+              fontSize: 18.028,
+              fontWeight: FontWeight.w400,
+              color: Colors.white,
+              height: 17.393 / 18.028,
+            ).copyWith(leadingDistribution: TextLeadingDistribution.even),
+          ),
+        ),
+        const Positioned(
+          top: _kTitleTop,
+          left: _kGutterLeft,
+          child: Text(
+            'Vouchers',
+            style: TextStyle(
+              fontFamily: 'CalSans',
+              fontWeight: FontWeight.w600,
+              fontSize: 30,
+              color: Colors.white,
+              height: 19.296 / 30,
+              leadingDistribution: TextLeadingDistribution.even,
+            ),
+          ),
+        ),
+        Positioned(
+          top: _kHeaderButtonsTop,
+          right: _kGutterRight,
+          child: Row(
+            children: [
+              GlassIconButton(
+                svgAsset: _kIconFilter,
+                svgIncludesFrame: true,
+                iconSize: _kFilterSvgSize,
+                iconOffset: const Offset(_kFilterSvgInset, _kFilterSvgInset),
+                badgeCount: activeFilterCount,
+                onTap: onFilter,
+              ),
+              const SizedBox(width: _kHeaderButtonGap),
+              GlassIconButton(
+                svgAsset: _kIconSearch,
+                iconSize: 25.565,
+                iconOffset: const Offset(11.72, 11.72),
+                onTap: onSearch,
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: _kTabsTop,
+          left: _kGutterLeft,
+          right: _kGutterRight,
+          child: Row(
+            children: [
+              for (var i = 0; i < _tabs.length; i++) ...[
+                if (i > 0) const SizedBox(width: _kTabGap),
+                Expanded(
+                  child: _TabPill(
+                    label: _tabs[i],
+                    active: i == activeIndex,
+                    onTap: () => onTab(i),
+                  ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Figma tab: 46 tall, radius 10, Montserrat Regular 17 label 11 from the
+/// top. Active: white with dark olive text. Inactive: #4E523B, white text.
+class _TabPill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TabPill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: active,
+      button: true,
+      child: Material(
+        color: active ? Colors.white : AppColors.darkOliveLight,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_kButtonRadius),
+        ),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(_kButtonRadius),
+          ),
+          onTap: onTap,
+          child: SizedBox(
+            height: _kTabHeight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: _kTabLabelTop),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w400,
+                    color: active ? AppColors.darkOliveLight : Colors.white,
+                    height: _kTabLabelHeight / 17,
+                  ).copyWith(leadingDistribution: TextLeadingDistribution.even),
+                ),
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          // ── Available rewards ────────────────────────────────────────────
-          _SectionHeader(label: 'AVAILABLE REWARDS'),
-          rewardsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: CircularProgressIndicator()),
+/// Keyword search under the hero (banner title, voucher code, reward title).
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClose;
+
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(_kButtonRadius),
+      borderSide: BorderSide(
+        color: Colors.white.withValues(alpha: 0.5),
+        width: 0.5,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        _kGutterLeft,
+        _kSearchGap,
+        _kGutterRight,
+        0,
+      ),
+      child: SizedBox(
+        height: _kSearchHeight,
+        child: Material(
+          color: AppColors.darkOlive,
+          borderRadius: BorderRadius.circular(_kButtonRadius),
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            onChanged: onChanged,
+            cursorColor: Colors.white,
+            textInputAction: TextInputAction.search,
+            style: GoogleFonts.montserrat(fontSize: 14, color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search offers, voucher codes, rewards',
+              hintStyle: GoogleFonts.montserrat(fontSize: 14, color: _kMuted),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.10),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              suffixIcon: IconButton(
+                tooltip: 'Close search',
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: onClose,
+              ),
+              border: border,
+              enabledBorder: border,
+              focusedBorder: border.copyWith(
+                borderSide: const BorderSide(color: Colors.white),
+              ),
             ),
-            error: (e, _) => Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text('Could not load rewards: $e',
-                  style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            data: (rewards) {
-              if (rewards.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 32),
-                  child: Column(
-                    children: [
-                      Icon(Icons.card_giftcard_rounded,
-                          size: 48,
-                          color: AppColors.textMuted.withValues(alpha: 0.5)),
-                      const SizedBox(height: 12),
-                      Text('No rewards available yet',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.copyWith(color: AppColors.textSecondary)),
-                    ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Filter sheet: everything, or only what can be used right now. Pops the
+/// chosen value, or null when dismissed.
+class _FilterSheet extends StatelessWidget {
+  final bool onlyUsable;
+  const _FilterSheet({required this.onlyUsable});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget option(String title, String subtitle, bool value) {
+      final selected = value == onlyUsable;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(_kButtonRadius),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(_kButtonRadius),
+            onTap: () => Navigator.of(context).pop(value),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: flowBody(
+                            15,
+                            weight: FontWeight.w500,
+                            color: selected
+                                ? AppColors.darkOliveLight
+                                : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: flowBody(
+                            12,
+                            color: selected
+                                ? AppColors.darkOliveLight
+                                : _kMuted,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              }
-              return Column(
-                children: rewards
-                    .map((r) => _RewardCard(
-                          reward: r,
-                          totalPoints: totalPoints,
-                          onRedeem: () => _redeemReward(r),
-                        ))
-                    .toList(),
-              );
-            },
+                  if (selected)
+                    const Icon(
+                      Icons.check_rounded,
+                      color: AppColors.darkOliveLight,
+                    ),
+                ],
+              ),
+            ),
           ),
+        ),
+      );
+    }
 
-          const SizedBox(height: 32),
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.darkOlive,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        _kGutterLeft,
+        20,
+        _kGutterRight,
+        20 + MediaQuery.of(context).padding.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Show', style: flowHeading(22, height: 1.2)),
+          const SizedBox(height: 14),
+          option('Everything', 'All offers, vouchers and rewards', false),
+          option(
+            'Ready to use',
+            'Hide used or expired vouchers and rewards, and rewards you '
+                'don’t have enough points for yet',
+            true,
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Reward card ────────────────────────────────────────────────────────────────
+// ── Shared building blocks ────────────────────────────────────────────────────
+
+class _RefreshList extends StatelessWidget {
+  final ScrollController controller;
+  final Future<void> Function() onRefresh;
+  final List<Widget> children;
+  final double topPadding;
+  const _RefreshList({
+    required this.controller,
+    required this.onRefresh,
+    required this.children,
+    required this.topPadding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      color: AppColors.cream,
+      backgroundColor: AppColors.darkOlive,
+      onRefresh: onRefresh,
+      // Spinner appears under the hero, not behind it.
+      edgeOffset: _kHeroHeight,
+      child: ListView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(top: topPadding, bottom: 32),
+        children: children,
+      ),
+    );
+  }
+}
+
+class _Gutter extends StatelessWidget {
+  final Widget child;
+  const _Gutter(this.child);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: _kGutterLeft, right: _kGutterRight),
+    child: child,
+  );
+}
+
+/// Home section title: CalSans title over a small Montserrat subtitle.
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final double bottomGap;
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.bottomGap = 14,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_kGutterLeft, 0, _kGutterRight, bottomGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'CalSans',
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 23.741,
+              letterSpacing: 0.2374,
+              height: 32.54 / 23.741,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+              fontSize: 10.898,
+              fontWeight: FontWeight.w400,
+              height: 1.219,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Glass card (Cart summary / Add-ons): white 10% fill, hairline white
+/// border, order-card corners.
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const _GlassCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(_kCardRadius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+    ),
+    child: child,
+  );
+}
+
+class _EmptySection extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _EmptySection({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        _kGutterLeft,
+        4,
+        _kGutterRight,
+        _kCardGap,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: _kMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: flowBody(13, color: _kMuted, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardSkeleton extends StatelessWidget {
+  const _CardSkeleton();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      _kGutterLeft,
+      0,
+      _kGutterRight,
+      _kCardGap,
+    ),
+    child: Container(
+      height: 112,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(_kCardRadius),
+      ),
+    ),
+  );
+}
+
+/// Tinted status pill (History status style) with "#CODE" tag corners.
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _StatusPill(this.label, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(_kTagRadius),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
+    ),
+    child: Text(
+      label,
+      maxLines: 1,
+      style: flowBody(11, weight: FontWeight.w500, color: color, height: 1.2),
+    ),
+  );
+}
+
+/// "#CODE" tag: white 20% fill, hairline white border.
+class _CodeTag extends StatelessWidget {
+  final String code;
+  const _CodeTag(this.code);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(_kTagRadius),
+      border: Border.all(color: Colors.white, width: 0.3),
+    ),
+    child: Text(
+      code,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: flowBody(12, weight: FontWeight.w500).copyWith(letterSpacing: 0.8),
+    ),
+  );
+}
+
+/// Small olive action (Re-Order style), 44px tall for an easy tap target.
+class _PillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+  const _PillButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(_kButtonRadius);
+    return Semantics(
+      button: true,
+      child: Material(
+        color: _kPillOlive,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 84,
+              minHeight: _kPillHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  label,
+                  style: flowBody(15, weight: FontWeight.w500),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gold-tinted square behind an icon.
+class _IconTile extends StatelessWidget {
+  final IconData icon;
+  final bool muted;
+  const _IconTile(this.icon, {this.muted = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 44,
+    height: 44,
+    decoration: BoxDecoration(
+      color: (muted ? Colors.white : _kGold).withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(_kButtonRadius),
+      border: Border.all(
+        color: (muted ? Colors.white : _kGold).withValues(alpha: 0.35),
+        width: 0.5,
+      ),
+    ),
+    child: Icon(icon, size: 22, color: muted ? _kMuted : _kGold),
+  );
+}
+
+/// "Free Full Body Massage 90 min", "20% discount", "Rp 20.000 discount".
+String _rewardBenefit(Map<String, dynamic> reward) {
+  final type = reward['reward_type'] as String?;
+  final value = (reward['reward_value'] as num?)?.toDouble() ?? 0;
+  switch (type) {
+    case 'free_treatment':
+      final name =
+          (reward['reward_treatment'] as Map?)?['name'] as String? ??
+          'Treatment';
+      final duration =
+          (reward['reward_duration'] as Map?)?['duration_minutes'] as int?;
+      return duration != null ? 'Free $name $duration min' : 'Free $name';
+    case 'discount_percentage':
+      return '${value.toInt()}% discount';
+    case 'discount_flat':
+      return '${formatRupiah(value)} discount';
+    default:
+      return reward['description'] as String? ?? 'Special reward';
+  }
+}
+
+// ── Promo code field ──────────────────────────────────────────────────────────
+
+class _PromoCodeField extends StatelessWidget {
+  final TextEditingController controller;
+  final String? error;
+  final bool isSaving;
+  final VoidCallback onSave;
+
+  const _PromoCodeField({
+    required this.controller,
+    required this.error,
+    required this.isSaving,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    OutlineInputBorder border(Color c, [double w = 0.5]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(_kButtonRadius),
+      borderSide: BorderSide(color: c, width: w),
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            textCapitalization: TextCapitalization.characters,
+            onSubmitted: (_) => onSave(),
+            cursorColor: Colors.white,
+            style: flowBody(14).copyWith(letterSpacing: 0.8),
+            decoration: InputDecoration(
+              hintText: 'Enter promo code',
+              hintStyle: flowBody(14, color: _kMuted),
+              errorText: error,
+              errorStyle: flowBody(12, color: const Color(0xFFFFB4A8)),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.10),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 13,
+              ),
+              border: border(Colors.white.withValues(alpha: 0.5)),
+              enabledBorder: border(Colors.white.withValues(alpha: 0.5)),
+              focusedBorder: border(Colors.white, 1),
+              errorBorder: border(const Color(0xFFFFB4A8)),
+              focusedErrorBorder: border(const Color(0xFFFFB4A8), 1),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        isSaving
+            ? const SizedBox(
+                width: 84,
+                height: _kPillHeight,
+                child: Center(
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              )
+            : _PillButton(label: 'Save', onTap: onSave),
+      ],
+    );
+  }
+}
+
+// ── Special Offers banners ────────────────────────────────────────────────────
+
+/// Horizontal banner row (Figma 1650:2750 / 1650:2764): Home "Popular" card
+/// styling, bleeding off the right edge like the Home carousel.
+class _BannerList extends StatelessWidget {
+  final List<PromoBanner> banners;
+  final bool loading;
+  const _BannerList({required this.banners, required this.loading});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _kBannerHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(
+          left: _kGutterLeft,
+          right: _kGutterRight,
+        ),
+        itemCount: loading ? 2 : banners.length,
+        separatorBuilder: (_, _) => const SizedBox(width: _kBannerGap),
+        itemBuilder: (_, i) => ClipRRect(
+          borderRadius: BorderRadius.circular(_kBannerRadius),
+          child: SizedBox(
+            width: _kBannerWidth,
+            child: loading
+                ? ColoredBox(color: Colors.white.withValues(alpha: 0.06))
+                : _BannerCard(banner: banners[i]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BannerCard extends StatelessWidget {
+  final PromoBanner banner;
+  const _BannerCard({required this.banner});
+
+  static const _fallback = Image(
+    image: AssetImage(_kBannerFallbackImage),
+    fit: BoxFit.cover,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (hasImage)
+          Image.network(
+            banner.imageUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _fallback,
+          )
+        else
+          _fallback,
+        // Figma gradient: clear from 2.846% → 83% black at the bottom.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0xD4000000)],
+              stops: [0.02846, 1.0],
+            ),
+          ),
+        ),
+        Positioned(
+          left: _kBannerTextLeft,
+          right: _kBannerTextRight,
+          bottom: _kBannerTextBottom,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                banner.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'CalSans',
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 19.396,
+                  height: 25.02 / 19.396, // title 393.66 → subtitle 418.68
+                  leadingDistribution: TextLeadingDistribution.even,
+                ),
+              ),
+              if (banner.subtitle != null && banner.subtitle!.isNotEmpty)
+                Text(
+                  banner.subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.montserrat(
+                    color: Colors.white,
+                    fontSize: 9.698,
+                    fontWeight: FontWeight.w400,
+                    height: 13.325 / 9.698,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── My Vouchers card ──────────────────────────────────────────────────────────
+
+class _VoucherCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final ValueChanged<String> onUse;
+  const _VoucherCard({required this.data, required this.onUse});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = (data['voucher'] as Map<String, dynamic>?) ?? {};
+    final code = (v['code'] as String?) ?? '';
+    final description = v['description'] as String?;
+
+    final type = v['discount_type'] as String?;
+    final value = (v['discount_value'] as num?)?.toDouble() ?? 0;
+    final discount = switch (type) {
+      'percentage' => '${value.toInt()}% OFF',
+      'flat' => '${formatRupiah(value)} OFF',
+      _ => 'Voucher',
+    };
+
+    final expiryRaw = (v['expires_at'] ?? v['valid_until']) as String?;
+    final expiry = expiryRaw == null ? null : DateTime.tryParse(expiryRaw);
+    final isExpired = expiry?.isBefore(DateTime.now()) ?? false;
+    final isUsed = data['is_used'] == true || data['used_at'] != null;
+    final minOrder = (v['min_order_amount'] as num?)?.toDouble();
+
+    final (String status, Color statusColor) = isUsed
+        ? ('Used', _kMuted)
+        : isExpired
+        ? ('Expired', _kExpired)
+        : ('Active', _kActive);
+    final usable = !isUsed && !isExpired && code.isNotEmpty;
+
+    final details = [
+      if (minOrder != null && minOrder > 0)
+        'Min. purchase ${formatRupiah(minOrder)}',
+      if (expiry != null)
+        '${isExpired ? 'Expired' : 'Valid until'} '
+            '${DateFormat('d MMM y').format(expiry.toLocal())}',
+    ];
+
+    return Opacity(
+      opacity: usable ? 1 : 0.6,
+      child: _GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    discount,
+                    style: flowHeading(24, height: 1.1),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _StatusPill(status, statusColor),
+              ],
+            ),
+            if (description != null && description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: flowBody(12.5, color: Colors.white70, height: 1.35),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (code.isNotEmpty) _CodeTag(code),
+                      for (final line in details) ...[
+                        const SizedBox(height: 6),
+                        Text(line, style: flowBody(12, color: _kMuted)),
+                      ],
+                    ],
+                  ),
+                ),
+                if (usable) ...[
+                  const SizedBox(width: 12),
+                  _PillButton(label: 'Use', onTap: () => onUse(code)),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── My Rewards card ───────────────────────────────────────────────────────────
+
+class _RedemptionCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final VoidCallback onUse;
+  const _RedemptionCard({required this.data, required this.onUse});
+
+  @override
+  Widget build(BuildContext context) {
+    final reward = (data['rewards'] as Map<String, dynamic>?) ?? {};
+    final title = (reward['title'] as String?) ?? 'Reward';
+    final isUsed = (data['is_used'] as bool?) ?? false;
+
+    return Opacity(
+      opacity: isUsed ? 0.6 : 1,
+      child: _GlassCard(
+        child: Row(
+          children: [
+            _IconTile(Icons.card_giftcard_rounded, muted: isUsed),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: flowHeading(18, height: 1.2),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _rewardBenefit(reward),
+                    style: flowBody(13, color: Colors.white70, height: 1.3),
+                  ),
+                  const SizedBox(height: 8),
+                  _StatusPill(
+                    isUsed ? 'Used' : 'Active',
+                    isUsed ? _kMuted : _kActive,
+                  ),
+                ],
+              ),
+            ),
+            if (!isUsed) ...[
+              const SizedBox(width: 12),
+              _PillButton(label: 'Use', onTap: onUse),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Points balance ────────────────────────────────────────────────────────────
+
+class _PointsBalanceCard extends StatelessWidget {
+  final int points;
+  final bool loading;
+  const _PointsBalanceCard({required this.points, required this.loading});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          const _IconTile(Icons.star_rounded),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Points',
+                  style: flowBody(12, weight: FontWeight.w500, color: _kMuted),
+                ),
+                const SizedBox(height: 4),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: loading
+                            ? '—'
+                            : NumberFormat.decimalPattern('id').format(points),
+                        style: flowHeading(34, height: 1),
+                      ),
+                      TextSpan(
+                        text: '  pts',
+                        style: flowBody(14, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Reward card (Point & Rewards) ─────────────────────────────────────────────
 
 class _RewardCard extends StatelessWidget {
   final Map<String, dynamic> reward;
   final int totalPoints;
   final VoidCallback onRedeem;
+
   const _RewardCard({
     required this.reward,
     required this.totalPoints,
     required this.onRedeem,
   });
-
-  String _rewardDetailText() {
-    final type = reward['reward_type'] as String?;
-    final value = (reward['reward_value'] as num?)?.toDouble() ?? 0;
-    switch (type) {
-      case 'free_treatment':
-        final name =
-            (reward['reward_treatment'] as Map?)?['name'] as String? ??
-                'Treatment';
-        final duration =
-            (reward['reward_duration'] as Map?)?['duration_minutes'] as int?;
-        return duration != null ? 'Free $name ($duration min)' : 'Free $name';
-      case 'discount_percentage':
-        return '${value.toInt()}% discount on your order';
-      case 'discount_flat':
-        return '${formatRupiah(value)} off your order';
-      default:
-        return reward['description'] as String? ?? 'Special reward';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -550,106 +1709,44 @@ class _RewardCard extends StatelessWidget {
         : 1.0;
     final title = (reward['title'] as String?) ?? '';
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title row + points badge
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.card_giftcard_rounded,
-                  color: AppColors.goldDark, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.goldLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$pointsRequired pts',
-                  style: const TextStyle(
-                    color: AppColors.goldDark,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              Expanded(child: Text(title, style: flowHeading(18, height: 1.2))),
+              const SizedBox(width: 10),
+              _StatusPill('$pointsRequired pts', _kGold),
             ],
-          ),
-          const SizedBox(height: 6),
-
-          // Reward text
-          Text(
-            _rewardDetailText(),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: AppColors.surfaceVariant,
-              valueColor:
-                  const AlwaysStoppedAnimation(AppColors.primary),
-            ),
           ),
           const SizedBox(height: 4),
           Text(
-            '$totalPoints / $pointsRequired pts',
-            style: const TextStyle(
-                color: AppColors.textMuted, fontSize: 11),
+            _rewardBenefit(reward),
+            style: flowBody(13, color: Colors.white70, height: 1.3),
           ),
-          const SizedBox(height: 12),
-
-          // Redeem button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: canRedeem ? onRedeem : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    canRedeem ? AppColors.primary : AppColors.surfaceVariant,
-                foregroundColor:
-                    canRedeem ? Colors.white : AppColors.textMuted,
-                elevation: 0,
-                minimumSize: const Size(double.infinity, 42),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                canRedeem
-                    ? 'Redeem'
-                    : 'Need ${pointsRequired - totalPoints} more pts',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 13),
-              ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              valueColor: const AlwaysStoppedAnimation(_kGold),
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${totalPoints.clamp(0, pointsRequired)} / $pointsRequired pts',
+            style: flowBody(11.5, color: _kMuted),
+          ),
+          const SizedBox(height: 14),
+          _RedeemButton(
+            label: canRedeem
+                ? 'Redeem'
+                : 'Need ${pointsRequired - totalPoints} more pts',
+            onTap: canRedeem ? onRedeem : null,
           ),
         ],
       ),
@@ -657,461 +1754,46 @@ class _RewardCard extends StatelessWidget {
   }
 }
 
-// ── Voucher redemption card ────────────────────────────────────────────────────
-
-class _VoucherRedemptionCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  final VoidCallback? onUse;
-  const _VoucherRedemptionCard({required this.data, this.onUse});
-
-  String _rewardDetailText(Map<String, dynamic> reward) {
-    final type = reward['reward_type'] as String?;
-    final value = (reward['reward_value'] as num?)?.toDouble() ?? 0;
-    switch (type) {
-      case 'free_treatment':
-        final name =
-            (reward['reward_treatment'] as Map?)?['name'] as String? ??
-                'Treatment';
-        final duration =
-            (reward['reward_duration'] as Map?)?['duration_minutes'] as int?;
-        return duration != null ? 'Free $name ($duration min)' : 'Free $name';
-      case 'discount_percentage':
-        return '${value.toInt()}% discount on your order';
-      case 'discount_flat':
-        return '${formatRupiah(value)} off your order';
-      default:
-        return reward['description'] as String? ?? '';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final reward = (data['rewards'] as Map<String, dynamic>?) ?? {};
-    final rewardTitle = (reward['title'] as String?) ?? 'Reward';
-    final isUsed = (data['is_used'] as bool?) ?? false;
-    final usedAt = data['used_at'] as String?;
-    final detailText = _rewardDetailText(reward);
-
-    final String statusText;
-    if (isUsed && usedAt != null) {
-      final d = DateTime.tryParse(usedAt);
-      final formatted =
-          d != null ? '${d.day}/${d.month}/${d.year}' : '';
-      statusText = 'Used on $formatted';
-    } else if (isUsed) {
-      statusText = 'Used';
-    } else {
-      statusText = 'Active – tap Use to redeem';
-    }
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isUsed ? AppColors.surfaceVariant : AppColors.goldLight,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.card_giftcard_rounded,
-              color: isUsed ? AppColors.textMuted : AppColors.goldDark,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rewardTitle,
-                  style: text.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                if (detailText.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isUsed
-                          ? AppColors.surfaceVariant
-                          : AppColors.goldLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      detailText,
-                      style: text.bodySmall?.copyWith(
-                        color: isUsed
-                            ? AppColors.textMuted
-                            : AppColors.goldDark,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 5),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isUsed
-                        ? AppColors.textMuted
-                        : const Color(0xFF155724),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!isUsed) ...[
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: onUse,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.goldDark,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                minimumSize: const Size(60, 36),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Use',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ── Section header ─────────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
+/// White primary button when [onTap] is set; muted glass when disabled.
+class _RedeemButton extends StatelessWidget {
   final String label;
-  const _SectionHeader({required this.label});
+  final VoidCallback? onTap;
+  const _RedeemButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Text(
-        label,
-        style: AppTypography.overline.copyWith(
-          color: AppColors.textSecondary,
-          letterSpacing: 1.2,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
+    final enabled = onTap != null;
+    final radius = BorderRadius.circular(_kButtonRadius);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: Material(
+        color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.06),
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: enabled
+              ? BorderSide.none
+              : BorderSide(color: Colors.white.withValues(alpha: 0.15)),
         ),
-      ),
-    );
-  }
-}
-
-// ── Banner carousel ────────────────────────────────────────────────────────────
-
-class _BannerCarousel extends StatelessWidget {
-  final List<PromoBanner> banners;
-  const _BannerCarousel({required this.banners});
-
-  static const _gradients = [
-    [AppColors.secondary, AppColors.primary],
-    [AppColors.primary, AppColors.primaryDark],
-    [AppColors.primaryDark, AppColors.secondary],
-    [AppColors.secondary, AppColors.primaryDark],
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return SizedBox(
-      height: 148,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: banners.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final banner = banners[i];
-          final grad = _gradients[i % _gradients.length];
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                Container(
-                  width: 280,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: grad,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: banner.imageUrl != null
-                      ? Image.network(
-                          banner.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox(),
-                        )
-                      : null,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: SizedBox(
+            height: _kPillHeight,
+            width: double.infinity,
+            child: Center(
+              child: Text(
+                label,
+                style: flowBody(
+                  15,
+                  weight: FontWeight.w500,
+                  color: enabled ? AppColors.darkOliveLight : _kMuted,
                 ),
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 20,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (banner.subtitle != null)
-                        Text(
-                          banner.subtitle!,
-                          style: text.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      Text(
-                        banner.title,
-                        style: text.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _BannerSkeleton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 148,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: 2,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (_, __) => Container(
-          width: 280,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
     );
   }
 }
-
-class _EmptyBanners extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 148,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Center(
-        child: Text(
-          'No active promotions',
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: AppColors.textSecondary),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Promo voucher card ─────────────────────────────────────────────────────────
-
-class _PromoVoucherCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  final VoidCallback? onUse;
-  const _PromoVoucherCard({required this.data, this.onUse});
-
-  String _discountText(Map<String, dynamic> v) {
-    final type = v['discount_type'] as String?;
-    final value = (v['discount_value'] as num?)?.toDouble() ?? 0;
-    if (type == 'percentage') return '${value.toInt()}% off';
-    if (type == 'flat') return '${formatRupiah(value)} off';
-    return '';
-  }
-
-  bool _isExpired(Map<String, dynamic> v) {
-    final exp = v['expires_at'] ?? v['valid_until'];
-    if (exp == null) return false;
-    return DateTime.tryParse(exp as String)?.isBefore(DateTime.now()) ?? false;
-  }
-
-  String? _expiryText(Map<String, dynamic> v) {
-    final raw = (v['expires_at'] ?? v['valid_until']) as String?;
-    if (raw == null) return null;
-    final d = DateTime.tryParse(raw);
-    if (d == null) return null;
-    return 'Valid until ${d.day}/${d.month}/${d.year}';
-  }
-
-  String? _minOrderText(Map<String, dynamic> v) {
-    final min = (v['min_order_amount'] as num?)?.toDouble();
-    if (min == null || min <= 0) return null;
-    return 'Min. order ${formatRupiah(min)}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final voucher = (data['voucher'] as Map<String, dynamic>?) ?? {};
-    final code = (voucher['code'] as String?) ?? '';
-    final description = voucher['description'] as String?;
-    final discount = _discountText(voucher);
-    final expired = _isExpired(voucher);
-    final expiry = _expiryText(voucher);
-    final minOrder = _minOrderText(voucher);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: expired ? AppColors.textMuted : AppColors.primary,
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(12)),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.local_offer_rounded,
-                      color: expired ? AppColors.textMuted : AppColors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            code,
-                            style: text.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: expired
-                                  ? AppColors.textMuted
-                                  : AppColors.textPrimary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          if (description != null && description.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(description,
-                                style: text.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary)),
-                          ],
-                          if (discount.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(discount,
-                                style: text.bodySmall?.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                          if (minOrder != null) ...[
-                            const SizedBox(height: 2),
-                            Text(minOrder,
-                                style: text.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary)),
-                          ],
-                          if (expiry != null) ...[
-                            const SizedBox(height: 2),
-                            Text(expiry,
-                                style: text.bodySmall?.copyWith(
-                                    color: expired
-                                        ? AppColors.textMuted
-                                        : AppColors.textSecondary,
-                                    fontSize: 11)),
-                          ],
-                          const SizedBox(height: 2),
-                          Text(
-                            expired ? 'Expired' : 'Active',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: expired
-                                  ? AppColors.textMuted
-                                  : const Color(0xFF2E7D32),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!expired) ...[
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: onUse,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          minimumSize: const Size(60, 36),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Use',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
