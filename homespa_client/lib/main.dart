@@ -17,14 +17,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Push is best-effort: on iOS, Firebase throws until the iOS app is
+  // registered (GoogleService-Info.plist) — the app must still launch.
+  var firebaseReady = false;
   if (!kIsWeb) {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+      firebaseReady = true;
+    } catch (e) {
+      debugPrint('Firebase unavailable, push disabled: $e');
+    }
   }
 
   await AuthSession.load();
 
-  if (!kIsWeb && AuthSession.current != null) {
+  if (firebaseReady && AuthSession.current != null) {
     await NotificationService.init();
   }
 

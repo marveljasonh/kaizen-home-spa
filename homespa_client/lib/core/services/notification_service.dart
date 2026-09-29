@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
@@ -10,7 +11,9 @@ class NotificationService {
   static final _messaging = FirebaseMessaging.instance;
 
   static Future<void> init() async {
-    if (kIsWeb) return;
+    // No-op until Firebase is configured for this platform (iOS needs
+    // GoogleService-Info.plist) — push is best-effort, never a crash.
+    if (kIsWeb || Firebase.apps.isEmpty) return;
 
     // Request permission (Android 13+ / iOS)
     final settings = await _messaging.requestPermission(
