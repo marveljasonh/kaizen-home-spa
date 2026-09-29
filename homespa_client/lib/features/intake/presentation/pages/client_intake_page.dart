@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
 import '../providers/intake_providers.dart';
 
 // Client Intake Form: full-screen stepper, one question per screen, on the
@@ -153,28 +154,29 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   }
 
   Future<void> _save() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
+    final customerId = AuthSession.current?.customerId;
+    if (customerId == null) return;
     final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _isSaving = true);
     try {
-      await Supabase.instance.client.from('client_intake').upsert({
-        'client_id': userId,
-        'health_conditions': _healthNone
-            ? <String>[]
-            : [
-                for (final c in _kHealthConditions)
-                  if (_health.contains(c)) c,
-              ],
-        'focus_areas': [
-          for (final a in _kFocusAreas)
-            if (_focus.contains(a)) a,
-        ],
-        'pressure': _pressure,
-        'avoid_areas': _avoidYes ? _avoidCtrl.text.trim() : null,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'client_id');
+      await apiClient.put(
+        '/customers/$customerId/intake',
+        body: {
+          'healthConditions': _healthNone
+              ? <String>[]
+              : [
+                  for (final c in _kHealthConditions)
+                    if (_health.contains(c)) c,
+                ],
+          'focusAreas': [
+            for (final a in _kFocusAreas)
+              if (_focus.contains(a)) a,
+          ],
+          'pressure': _pressure,
+          'avoidAreas': _avoidYes ? _avoidCtrl.text.trim() : null,
+        },
+      );
 
       // Refetch before navigating, so the router sees the saved row and
       // doesn't send the user back here.

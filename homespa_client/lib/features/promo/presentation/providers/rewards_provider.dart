@@ -1,85 +1,104 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import 'promo_providers.dart';
+
+String? _customerId() => AuthSession.current?.customerId;
+
+/// Loyalty points balance from the platform profile.
 final clientTotalPointsProvider = FutureProvider<int>((ref) async {
-  final client = Supabase.instance.client;
-  final userId = client.auth.currentUser?.id;
-  if (userId == null) return 0;
-
-  final data = await client
-      .from('client_points')
-      .select('points_earned')
-      .eq('client_id', userId);
-
-  return (data as List).fold<int>(
-    0,
-    (sum, row) => sum + (row['points_earned'] as int),
-  );
+  ref.watch(authNotifierProvider);
+  final customerId = _customerId();
+  if (customerId == null) return 0;
+  final json =
+      await apiClient.get('/customers/$customerId/profile')
+          as Map<String, dynamic>;
+  final profile = json['profile'] as Map<String, dynamic>;
+  return (profile['loyaltyPoints'] as num?)?.toInt() ?? 0;
 });
 
+Map<String, dynamic> _rewardShape(Map<String, dynamic> r) => {
+  'id': r['id'],
+  'title': r['title'],
+  'description': r['description'],
+  // Platform reward types → the labels the page renders.
+  'reward_type': (r['rewardType'] as String?) == 'free_package'
+      ? 'free_treatment'
+      : 'discount_flat',
+  'reward_value': r['discountIdr'],
+  'points_required': r['pointsRequired'],
+  // The reward's platform package id — createBooking books exactly this.
+  'reward_treatment_id': r['packageId'],
+  'reward_treatment': {'name': r['packageName']},
+  'reward_duration': {
+    'duration_minutes': (r['packageDurationMin'] as num?)?.toInt(),
+  },
+};
+
+/// Points-priced rewards catalog (GET /rewards), shaped for the page.
 final rewardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final data = await Supabase.instance.client
-      .from('rewards')
-      .select(
-        '*,'
-        'reward_treatment:treatments!rewards_reward_treatment_id_fkey(name),'
-        'reward_duration:treatment_durations!rewards_reward_treatment_duration_id_fkey(duration_minutes)',
-      )
-      .eq('is_active', true)
-      .order('points_required', ascending: true);
-  return List<Map<String, dynamic>>.from(data);
+  final json = await apiClient.get('/rewards') as Map<String, dynamic>;
+  return [
+    for (final r in (json['rewards'] as List).cast<Map<String, dynamic>>())
+      _rewardShape(r),
+  ];
 });
 
+/// The customer's unused redemptions (GET /customers/{id}/reward-redemptions).
 final myRedemptionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  debugPrint('myRedemptionsProvider userId: $userId');
-  if (userId == null) return [];
-
-  final data = await Supabase.instance.client
-      .from('reward_redemptions')
-      .select(
-        '*, rewards(title, description, reward_type, reward_value, '
-        'reward_treatment_id, reward_treatment_duration_id, '
-        'reward_treatment:treatments!rewards_reward_treatment_id_fkey(name), '
-        'reward_duration:treatment_durations!rewards_reward_treatment_duration_id_fkey(duration_minutes, price))',
-      )
-      .eq('client_id', userId)
-      .eq('is_used', false)
-      .order('created_at', ascending: false);
-
-  debugPrint('myRedemptionsProvider data: ${data.length} items');
-  debugPrint(
-    'myRedemptionsProvider first: ${data.isNotEmpty ? data.first : 'empty'}',
-  );
-
-  return List<Map<String, dynamic>>.from(data);
+  ref.watch(authNotifierProvider);
+  final customerId = _customerId();
+  if (customerId == null) return [];
+  final json =
+      await apiClient.get('/customers/$customerId/reward-redemptions')
+          as Map<String, dynamic>;
+  return [
+    for (final r
+        in (json['redemptions'] as List).cast<Map<String, dynamic>>())
+      if (r['isUsed'] != true)
+        {
+          'id': r['id'],
+          'is_used': r['isUsed'],
+          'created_at': r['createdAt'],
+          'rewards': _rewardShape({
+            'id': r['id'],
+            'title': r['rewardTitle'],
+            'description': null,
+            'rewardType': r['rewardType'],
+            'discountIdr': r['discountIdr'],
+            'pointsRequired': r['pointsSpent'],
+            'packageId': r['packageId'],
+            'packageName': r['packageName'],
+            'packageDurationMin': r['packageDurationMin'],
+          }),
+        },
+  ];
 });
 
+/// Redeems a reward with points on the platform (atomic balance check).
+Future<void> redeemReward(String rewardId) async {
+  final customerId = _customerId();
+  if (customerId == null) {
+    throw const ApiException('Not signed in', 401);
+  }
+  await apiClient.post(
+    '/customers/$customerId/reward-redemptions',
+    body: {'rewardId': rewardId},
+  );
+}
+
+/// Active platform promo codes, shaped like the old saved-voucher rows.
 final clientVouchersProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  if (userId == null) return [];
-  final data = await Supabase.instance.client
-      .from('client_vouchers')
-      .select('*, voucher:vouchers(*)')
-      .eq('client_id', userId)
-      .order('created_at', ascending: false);
-  return List<Map<String, dynamic>>.from(data);
+  return ref.read(promoDataSourceProvider).getPromos();
 });
 
 final unusedVouchersProvider = FutureProvider<int>((ref) async {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  if (userId == null) return 0;
-
-  final data = await Supabase.instance.client
-      .from('reward_redemptions')
-      .select('id')
-      .eq('client_id', userId)
-      .eq('is_used', false);
-
-  return (data as List).length;
+  final redemptions = await ref.watch(myRedemptionsProvider.future);
+  return redemptions.length;
 });

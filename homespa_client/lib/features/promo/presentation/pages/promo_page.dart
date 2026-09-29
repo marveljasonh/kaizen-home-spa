@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -13,6 +12,7 @@ import '../../../../core/widgets/kaizen_page.dart';
 import '../../../booking/presentation/providers/booking_cart.dart';
 import '../../../promo/domain/entities/promo_banner.dart';
 import '../../../treatments/presentation/widgets/glass_icon_button.dart';
+import '../../../booking/presentation/providers/booking_providers.dart';
 import '../providers/promo_providers.dart';
 import '../providers/rewards_provider.dart';
 
@@ -174,42 +174,32 @@ class _PromoPageState extends ConsumerState<PromoPage>
     });
 
     try {
-      final voucher = await Supabase.instance.client
-          .from('vouchers')
-          .select('id')
-          .eq('code', code)
-          .eq('is_active', true)
-          .maybeSingle();
+      final result = await ref
+          .read(validateVoucherUseCaseProvider)
+          .call(code);
 
       if (!mounted) return;
 
-      if (voucher == null) {
-        setState(() {
-          _applyError = 'Promo code not found or inactive';
-          _isApplying = false;
-        });
-        return;
-      }
-
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId != null) {
-        await Supabase.instance.client.from('client_vouchers').upsert({
-          'client_id': userId,
-          'voucher_id': voucher['id'],
-        }, onConflict: 'client_id,voucher_id');
-      }
-
-      _codeController.clear();
-      ref.invalidate(clientVouchersProvider);
-      if (!mounted) return;
-      setState(() {
-        _isApplying = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher saved to My Vouchers!'),
-          backgroundColor: AppColors.primary,
-        ),
+      result.fold(
+        (failure) {
+          setState(() {
+            _applyError = failure.message;
+            _isApplying = false;
+          });
+        },
+        (_) {
+          _codeController.clear();
+          ref.invalidate(clientVouchersProvider);
+          setState(() {
+            _isApplying = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Promo code is valid — apply it at checkout!'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
@@ -567,30 +557,9 @@ class _PointsRewardsTab extends ConsumerStatefulWidget {
 
 class _PointsRewardsTabState extends ConsumerState<_PointsRewardsTab> {
   Future<void> _redeemReward(Map<String, dynamic> reward) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-
     try {
-      await Supabase.instance.client.from('reward_redemptions').insert({
-        'client_id': userId,
-        'reward_id': reward['id'],
-        'points_spent': reward['points_required'],
-      });
-
-      await Supabase.instance.client
-          .from('rewards')
-          .update({
-            'total_redeemed': ((reward['total_redeemed'] as int?) ?? 0) + 1,
-          })
-          .eq('id', reward['id']);
-
-      // Deduct points by inserting a negative entry
-      await Supabase.instance.client.from('client_points').insert({
-        'client_id': userId,
-        'points_earned': -(reward['points_required'] as int),
-        'description': 'Redeemed: ${reward['title']}',
-        'booking_id': null,
-      });
+      // Platform deducts the points atomically (fails on low balance).
+      await redeemReward(reward['id'] as String);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

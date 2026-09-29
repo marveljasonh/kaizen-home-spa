@@ -17,10 +17,10 @@ class ClientIntake {
   });
 
   factory ClientIntake.fromJson(Map<String, dynamic> json) => ClientIntake(
-    healthConditions: _strings(json['health_conditions']),
-    focusAreas: _strings(json['focus_areas']),
+    healthConditions: _strings(json['healthConditions']),
+    focusAreas: _strings(json['focusAreas']),
     pressure: json['pressure'] as String? ?? 'medium',
-    avoidAreas: json['avoid_areas'] as String?,
+    avoidAreas: json['avoidAreas'] as String?,
   );
 
   static List<String> _strings(Object? value) =>

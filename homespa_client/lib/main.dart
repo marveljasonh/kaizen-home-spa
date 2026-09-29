@@ -3,7 +3,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/api/auth_session.dart';
@@ -22,14 +21,6 @@ Future<void> main() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
-
-  // Supabase stays only for features not yet migrated to the platform API;
-  // auth/session is the platform's (AuthSession).
-  await Supabase.initialize(
-    url: 'https://zxiofkulrvjtpusgzoei.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4aW9ma3VscnZqdHB1c2d6b2VpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNjQ3ODAsImV4cCI6MjA5Njc0MDc4MH0.7-0OQtBE_Uf3eGIiMYN_baqugLHqwEK0aqIC5uH7cJ0',
-  );
 
   await AuthSession.load();
 
