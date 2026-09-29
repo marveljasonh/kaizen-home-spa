@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
 import '../../../../core/errors/failures.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -11,17 +12,18 @@ class AuthRepositoryImpl implements AuthRepository {
   const AuthRepositoryImpl(this._dataSource);
 
   @override
-  Future<Either<Failure, AppUser>> signInWithEmail({
-    required String email,
+  Future<Either<Failure, AppUser>> signIn({
+    required String phone,
     required String password,
   }) async {
     try {
-      final user = await _dataSource.signInWithEmail(
-        email: email,
+      final session = await _dataSource.signIn(
+        phone: phone,
         password: password,
       );
-      return Right(user);
-    } on AuthException catch (e) {
+      await session.save();
+      return Right(AppUser.fromSession(session));
+    } on ApiException catch (e) {
       return Left(AuthFailure(e.message));
     } catch (e) {
       return Left(AuthFailure(e.toString()));
@@ -29,19 +31,59 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, AppUser>> signUpWithEmail({
-    required String email,
-    required String password,
+  Future<Either<Failure, AppUser>> signUp({
     required String name,
+    required String phone,
+    required String password,
+    String? referralCode,
   }) async {
     try {
-      final user = await _dataSource.signUpWithEmail(
-        email: email,
-        password: password,
+      final session = await _dataSource.register(
         name: name,
+        phone: phone,
+        password: password,
+        referralCode: referralCode,
       );
+      await session.save();
+      return Right(AppUser.fromSession(session));
+    } on ApiException catch (e) {
+      return Left(AuthFailure(e.message));
+    } catch (e) {
+      return Left(AuthFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, AppUser>> fetchProfile() async {
+    final session = AuthSession.current;
+    if (session == null) return const Left(AuthFailure('Not signed in'));
+    try {
+      final user = await _dataSource.fetchProfile(session.customerId);
       return Right(user);
-    } on AuthException catch (e) {
+    } on ApiException catch (e) {
+      return Left(AuthFailure(e.message));
+    } catch (e) {
+      return Left(AuthFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateProfile({
+    String? name,
+    String? email,
+    String? gender,
+  }) async {
+    final session = AuthSession.current;
+    if (session == null) return const Left(AuthFailure('Not signed in'));
+    try {
+      await _dataSource.updateProfile(
+        session.customerId,
+        name: name,
+        email: email,
+        gender: gender,
+      );
+      return const Right(null);
+    } on ApiException catch (e) {
       return Left(AuthFailure(e.message));
     } catch (e) {
       return Left(AuthFailure(e.toString()));
@@ -50,25 +92,14 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, void>> signOut() async {
-    try {
-      await _dataSource.signOut();
-      return const Right(null);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(e.message));
-    } catch (e) {
-      return Left(AuthFailure(e.toString()));
-    }
+    await AuthSession.clear();
+    return const Right(null);
   }
 
   @override
   AppUser? get currentUser {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return null;
-    return AppUser(
-      id: user.id,
-      email: user.email ?? '',
-      name: user.userMetadata?['name'] as String?,
-      avatarUrl: user.userMetadata?['avatar_url'] as String?,
-    );
+    final session = AuthSession.current;
+    if (session == null) return null;
+    return AppUser.fromSession(session);
   }
 }

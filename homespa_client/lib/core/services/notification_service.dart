@@ -1,6 +1,10 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../api/api_client.dart';
+import '../api/auth_session.dart';
 
 class NotificationService {
   static final _messaging = FirebaseMessaging.instance;
@@ -18,7 +22,7 @@ class NotificationService {
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
-    // Get token and persist to Supabase
+    // Get token and register it with the platform API
     final token = await _messaging.getToken();
     if (token != null) {
       await _saveToken(token);
@@ -36,15 +40,14 @@ class NotificationService {
   }
 
   static Future<void> _saveToken(String token) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
+    if (AuthSession.current == null) return;
 
     try {
-      await Supabase.instance.client
-          .from('profiles')
-          .update({'fcm_token': token})
-          .eq('id', userId);
-      debugPrint('FCM token saved for $userId');
+      await apiClient.post(
+        '/push-token',
+        body: {'token': token, 'platform': Platform.isIOS ? 'ios' : 'android'},
+      );
+      debugPrint('FCM token registered');
     } catch (e) {
       debugPrint('FCM token save failed: $e');
     }

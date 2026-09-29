@@ -18,13 +18,13 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -34,7 +34,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     await ref
         .read(authNotifierProvider.notifier)
         .signIn(
-          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
           password: _passwordController.text,
         );
   }
@@ -72,16 +72,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AuthTextField(
-                      controller: _emailController,
-                      label: 'Email',
-                      hint: 'you@example.com',
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _phoneController,
+                      label: 'Phone Number',
+                      hint: '0812 3456 7890',
+                      keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Email is required';
+                          return 'Phone number is required';
                         }
-                        if (!v.contains('@')) return 'Enter a valid email';
+                        if (v.trim().replaceAll(RegExp(r'\D'), '').length < 8) {
+                          return 'Enter a valid phone number';
+                        }
                         return null;
                       },
                     ),

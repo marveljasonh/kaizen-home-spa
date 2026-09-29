@@ -390,7 +390,7 @@ class _ProfileHeroRow extends StatelessWidget {
       children: [
         KaizenAvatar(
           url: user.avatarUrl,
-          initials: kaizenInitials(user.name, user.email),
+          initials: kaizenInitials(user.name, user.email ?? ''),
           size: _kAvatarSize,
         ),
         const SizedBox(width: 16),
@@ -400,14 +400,14 @@ class _ProfileHeroRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                (user.name?.trim().isNotEmpty ?? false) ? user.name! : 'Guest',
+                user.name.trim().isNotEmpty ? user.name : 'Guest',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: flowHeading(22, height: 1.2),
               ),
               const SizedBox(height: 2),
               Text(
-                user.email,
+                (user.email?.isNotEmpty ?? false) ? user.email! : user.phone,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: flowBody(12.5, color: kFlowMuted, height: 1.35),

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -12,7 +13,7 @@ import '../../domain/usecases/sign_up_usecase.dart';
 import 'auth_state.dart';
 
 final _authDataSourceProvider = Provider<AuthRemoteDataSource>(
-  (ref) => AuthRemoteDataSourceImpl(Supabase.instance.client),
+  (ref) => AuthRemoteDataSourceImpl(apiClient),
 );
 
 final authRepositoryProvider = Provider<AuthRepository>(
@@ -42,112 +43,74 @@ final authNotifierProvider = NotifierProvider<AuthNotifier, AppAuthState>(
 class AuthNotifier extends Notifier<AppAuthState> {
   @override
   AppAuthState build() {
-    final sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      // Suppress while explicit methods manage state transitions
-      if (state is AuthLoading) return;
-      final session = data.session;
-      state = session != null
-          ? AuthAuthenticated(_mapUser(session.user))
-          : const AuthUnauthenticated();
-    });
-    ref.onDispose(sub.cancel);
-
-    final session = Supabase.instance.client.auth.currentSession;
-    return session != null
-        ? AuthAuthenticated(_mapUser(session.user))
-        : const AuthUnauthenticated();
+    // AuthSession.load() ran in main() before runApp, so this is in sync with
+    // secure storage. Show the cached identity immediately and refresh the
+    // full profile in the background.
+    final session = AuthSession.current;
+    if (session == null) return const AuthUnauthenticated();
+    Future.microtask(refreshUser);
+    return AuthAuthenticated(AppUser.fromSession(session));
   }
 
-  Future<void> signIn({required String email, required String password}) async {
+  Future<void> signIn({required String phone, required String password}) async {
     state = const AuthLoading();
     final result = await ref
         .read(_signInUseCaseProvider)
-        .call(email: email, password: password);
+        .call(phone: phone, password: password);
     result.fold((failure) => state = AuthError(failure.message), (user) {
       state = AuthAuthenticated(user);
       NotificationService.init();
+      refreshUser();
     });
   }
 
-  Future<void> signUp({
-    required String email,
-    required String password,
+  /// Registers (or claims a legacy account), then saves email + gender to the
+  /// profile before surfacing the authenticated state.
+  Future<void> signUpAndSaveProfile({
     required String name,
+    required String phone,
+    required String password,
+    String? email,
+    String? gender,
+    String? referralCode,
   }) async {
     state = const AuthLoading();
     final result = await ref
         .read(_signUpUseCaseProvider)
-        .call(email: email, password: password, name: name);
-    result.fold((failure) => state = AuthError(failure.message), (user) {
-      // Set before the state change the router reacts to.
-      ref.read(justSignedUpProvider.notifier).state = true;
-      state = AuthAuthenticated(user);
-      NotificationService.init();
-    });
-  }
-
-  /// Creates the account then immediately saves phone + gender to profiles.
-  Future<void> signUpAndSaveProfile({
-    required String email,
-    required String password,
-    required String name,
-    required String phone,
-    required String gender,
-  }) async {
-    state = const AuthLoading();
-    try {
-      final client = Supabase.instance.client;
-      final response = await client.auth.signUp(
-        email: email,
-        password: password,
-        data: {'name': name},
-      );
-      final user = response.user;
-      if (user == null) {
-        state = const AuthError('Sign up failed. Please try again.');
-        return;
-      }
-      // Save phone + gender to profiles before surfacing authenticated state
-      await client.from('profiles').upsert({
-        'id': user.id,
-        'full_name': name,
-        'phone': phone,
-        'gender': gender,
-        'role': 'client',
-      }, onConflict: 'id');
-      // Set before the state change the router reacts to.
-      ref.read(justSignedUpProvider.notifier).state = true;
-      state = AuthAuthenticated(_mapUser(user));
-      NotificationService.init();
-    } on AuthException catch (e) {
-      state = AuthError(e.message);
-    } catch (e) {
-      state = AuthError(e.toString());
+        .call(
+          name: name,
+          phone: phone,
+          password: password,
+          referralCode: referralCode,
+        );
+    if (result.isLeft()) {
+      result.fold((failure) => state = AuthError(failure.message), (_) {});
+      return;
     }
+    final user = result.getOrElse(() => throw StateError('unreachable'));
+    // Best-effort: profile extras must not block a successful registration.
+    if ((email != null && email.isNotEmpty) || gender != null) {
+      await ref
+          .read(authRepositoryProvider)
+          .updateProfile(email: email, gender: gender);
+    }
+    // Set before the state change the router reacts to.
+    ref.read(justSignedUpProvider.notifier).state = true;
+    state = AuthAuthenticated(user);
+    NotificationService.init();
+    refreshUser();
   }
 
+  /// Re-fetches the profile (points, avatar, email, gender) from the server.
   Future<void> refreshUser() async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
-    try {
-      final profile = await client
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
-      state = AuthAuthenticated(
-        AppUser(
-          id: user.id,
-          email: user.email ?? '',
-          name: profile['full_name'] as String?,
-          avatarUrl: profile['avatar_url'] as String?,
-          phone: profile['phone'] as String?,
-        ),
-      );
-    } catch (_) {
-      // Non-fatal — keep existing state
-    }
+    if (AuthSession.current == null) return;
+    final result = await ref.read(authRepositoryProvider).fetchProfile();
+    result.fold(
+      (_) {
+        // Non-fatal — keep existing state
+      },
+      (user) => state = AuthAuthenticated(user),
+    );
   }
 
   Future<void> signOut() async {
@@ -159,12 +122,4 @@ class AuthNotifier extends Notifier<AppAuthState> {
       (_) => state = const AuthUnauthenticated(),
     );
   }
-
-  AppUser _mapUser(User user) => AppUser(
-    id: user.id,
-    email: user.email ?? '',
-    name: user.userMetadata?['name'] as String?,
-    avatarUrl: user.userMetadata?['avatar_url'] as String?,
-    phone: user.phone,
-  );
 }

@@ -48,9 +48,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         .read(authNotifierProvider.notifier)
         .signUpAndSaveProfile(
           name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
           phone: _phoneController.text.trim(),
+          password: _passwordController.text,
+          email: _emailController.text.trim(),
           gender: _gender!,
         );
   }
@@ -103,14 +103,12 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     const SizedBox(height: 16),
                     AuthTextField(
                       controller: _emailController,
-                      label: 'Email',
+                      label: 'Email (optional)',
                       hint: 'you@example.com',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Email is required';
-                        }
+                        if (v == null || v.trim().isEmpty) return null;
                         if (!v.contains('@')) return 'Enter a valid email';
                         return null;
                       },
