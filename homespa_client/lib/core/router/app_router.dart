@@ -19,6 +19,7 @@ import '../../features/booking/presentation/pages/review_confirm_page.dart';
 import '../../features/booking/presentation/pages/schedule_page.dart';
 import '../../features/booking/presentation/pages/therapist_selection_page.dart';
 import '../../features/booking/presentation/pages/voucher_page.dart';
+import '../../features/chat/presentation/pages/chat_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/intake/presentation/pages/client_intake_page.dart';
 import '../../features/intake/presentation/providers/intake_providers.dart';
@@ -118,6 +119,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // `extra`: the SavedAddress to edit; none adds a new one.
         builder: (context, state) =>
             AddAddressPage(address: state.extra as SavedAddress?),
+      ),
+
+      // ── In-app chat with the booking's therapist (no bottom nav) ─────────
+      GoRoute(
+        path: '/chat/:bookingId',
+        builder: (context, state) =>
+            ChatPage(bookingId: state.pathParameters['bookingId']!),
       ),
 
       // ── Booking detail ────────────────────────────────────────────────────

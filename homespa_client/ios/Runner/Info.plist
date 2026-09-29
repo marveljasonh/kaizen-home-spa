@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Digunakan untuk mengirim foto di chat booking Anda. / Used to send photos in your booking chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Digunakan untuk memilih foto yang dikirim di chat booking Anda. / Used to choose photos to send in your booking chat.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -153,54 +153,94 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   }
 
   Future<void> _save() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) {
+      debugPrint('[Intake] save skipped: no signed-in user');
+      _showSaveError();
+      return;
+    }
+
+    // Matches public.client_intake (supabase/client_intake.sql).
+    final payload = <String, dynamic>{
+      'client_id': userId,
+      'health_conditions': _healthNone
+          ? <String>[]
+          : <String>[
+              for (final c in _kHealthConditions)
+                if (_health.contains(c)) c,
+            ],
+      'focus_areas': <String>[
+        for (final a in _kFocusAreas)
+          if (_focus.contains(a)) a,
+      ],
+      'pressure': _kPressures.any((p) => p.$1 == _pressure)
+          ? _pressure
+          : 'medium',
+      'avoid_areas': _avoidYes && _avoidCtrl.text.trim().isNotEmpty
+          ? _avoidCtrl.text.trim()
+          : null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
 
     setState(() => _isSaving = true);
+    debugPrint(
+      '[Intake] upsert (${widget.editMode ? 'edit' : 'first time'}): $payload',
+    );
     try {
-      await Supabase.instance.client.from('client_intake').upsert({
-        'client_id': userId,
-        'health_conditions': _healthNone
-            ? <String>[]
-            : [
-                for (final c in _kHealthConditions)
-                  if (_health.contains(c)) c,
-              ],
-        'focus_areas': [
-          for (final a in _kFocusAreas)
-            if (_focus.contains(a)) a,
-        ],
-        'pressure': _pressure,
-        'avoid_areas': _avoidYes ? _avoidCtrl.text.trim() : null,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'client_id');
+      await client
+          .from('client_intake')
+          .upsert(payload, onConflict: 'client_id');
+    } on PostgrestException catch (e, st) {
+      debugPrint(
+        '[Intake] save failed: PostgrestException code=${e.code} '
+        'message=${e.message} details=${e.details} hint=${e.hint}',
+      );
+      debugPrint('$st');
+      _showSaveError();
+      return;
+    } catch (e, st) {
+      debugPrint('[Intake] save failed: ${e.runtimeType}: $e');
+      debugPrint('$st');
+      _showSaveError();
+      return;
+    }
+    debugPrint('[Intake] saved');
 
-      // Refetch before navigating, so the router sees the saved row and
-      // doesn't send the user back here.
+    // Refresh the cached answers before navigating, so the router sees the
+    // row. A failed refetch doesn't undo the save, so it isn't an error.
+    try {
       ref.invalidate(clientIntakeProvider);
       await ref.read(clientIntakeProvider.future);
-      if (!mounted) return;
-
-      if (widget.editMode) {
-        context.pop();
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Preferences updated')),
-        );
-      } else {
-        context.go('/');
-      }
     } catch (e) {
-      debugPrint('[Intake] save error: $e');
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      messenger.showSnackBar(
-        SnackBar(
-          content: const Text('Couldn’t save your answers. Please try again.'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      debugPrint('[Intake] refetch after save failed: $e');
     }
+    if (!mounted) return;
+
+    if (widget.editMode) {
+      final messenger = ScaffoldMessenger.of(context);
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/profile');
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Preferences updated')),
+      );
+    } else {
+      context.go('/');
+    }
+  }
+
+  void _showSaveError() {
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Couldn’t save your answers. Please try again.'),
+        backgroundColor: Colors.red.shade700,
+      ),
+    );
   }
 
   @override

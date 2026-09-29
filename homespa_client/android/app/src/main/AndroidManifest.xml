@@ -58,6 +58,11 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="whatsapp" />
         </intent>
+        <!-- Camera app for image_picker "Take Photo" (package visibility, API 30+).
+             No CAMERA permission is declared: the camera app takes the photo. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <package android:name="com.whatsapp" />
         <package android:name="com.google.android.apps.maps" />
     </queries>

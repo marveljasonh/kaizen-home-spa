@@ -40,9 +40,10 @@ class Treatment extends Equatable {
 
   double get displayPrice => defaultDuration?.price ?? basePrice;
 
-  /// Lowest price across durations ("Starting from …"), else the base price.
-  double get startingPrice => durations.isEmpty
-      ? basePrice
+  /// Lowest price across durations ("Starting from …"); null when the
+  /// treatment has no durations, so callers hide the badge.
+  double? get startingPrice => durations.isEmpty
+      ? null
       : durations.map((d) => d.price).reduce((a, b) => a < b ? a : b);
 
   int get displayDurationMinutes => defaultDuration?.durationMinutes ?? 60;

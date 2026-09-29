@@ -18,6 +18,36 @@ final clientTotalPointsProvider = FutureProvider<int>((ref) async {
   );
 });
 
+/// Adds `reward_treatment_image_url` (the free treatment's `image_url`) to
+/// each reward map. Flat query + inFilter, assembled in Dart.
+Future<void> _attachTreatmentImages(
+  SupabaseClient client,
+  Iterable<Map<String, dynamic>> rewards,
+) async {
+  final ids = {
+    for (final r in rewards)
+      if (r['reward_treatment_id'] is String)
+        r['reward_treatment_id'] as String,
+  }.toList();
+  if (ids.isEmpty) return;
+  try {
+    final rows = await client
+        .from('treatments')
+        .select('id, image_url')
+        .inFilter('id', ids);
+    final images = {
+      for (final row in rows as List<dynamic>)
+        (row as Map<String, dynamic>)['id'] as String: row['image_url'],
+    };
+    for (final r in rewards) {
+      r['reward_treatment_image_url'] = images[r['reward_treatment_id']];
+    }
+  } catch (e) {
+    // Cards fall back to the reward image or the bundled default.
+    debugPrint('[Rewards] treatment images ERROR: $e');
+  }
+}
+
 final rewardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final data = await Supabase.instance.client
       .from('rewards')
@@ -28,7 +58,10 @@ final rewardsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       )
       .eq('is_active', true)
       .order('points_required', ascending: true);
-  return List<Map<String, dynamic>>.from(data);
+  // `*` includes rewards.image_url.
+  final rewards = List<Map<String, dynamic>>.from(data);
+  await _attachTreatmentImages(Supabase.instance.client, rewards);
+  return rewards;
 });
 
 final myRedemptionsProvider = FutureProvider<List<Map<String, dynamic>>>((
@@ -41,7 +74,7 @@ final myRedemptionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   final data = await Supabase.instance.client
       .from('reward_redemptions')
       .select(
-        '*, rewards(title, description, reward_type, reward_value, '
+        '*, rewards(title, description, reward_type, reward_value, image_url, '
         'reward_treatment_id, reward_treatment_duration_id, '
         'reward_treatment:treatments!rewards_reward_treatment_id_fkey(name), '
         'reward_duration:treatment_durations!rewards_reward_treatment_duration_id_fkey(duration_minutes, price))',
@@ -51,11 +84,17 @@ final myRedemptionsProvider = FutureProvider<List<Map<String, dynamic>>>((
       .order('created_at', ascending: false);
 
   debugPrint('myRedemptionsProvider data: ${data.length} items');
+  final redemptions = List<Map<String, dynamic>>.from(data);
+  await _attachTreatmentImages(Supabase.instance.client, [
+    for (final r in redemptions)
+      if (r['rewards'] is Map<String, dynamic>)
+        r['rewards'] as Map<String, dynamic>,
+  ]);
   debugPrint(
     'myRedemptionsProvider first: ${data.isNotEmpty ? data.first : 'empty'}',
   );
 
-  return List<Map<String, dynamic>>.from(data);
+  return redemptions;
 });
 
 final clientVouchersProvider = FutureProvider<List<Map<String, dynamic>>>((

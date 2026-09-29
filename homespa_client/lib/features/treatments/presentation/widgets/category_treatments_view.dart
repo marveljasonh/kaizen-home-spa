@@ -307,11 +307,12 @@ class TreatmentPhotoCard extends StatelessWidget {
   // Right inset for wrapping text, so long names never reach the edge.
   static const double _textRight = 21.25;
 
-  static String _startingFrom(Treatment t) =>
-      'Starting From ${formatIdrK(t.startingPrice)}';
+  static String _startingFrom(double price) =>
+      'Starting From ${formatIdrK(price)}';
 
   @override
   Widget build(BuildContext context) {
+    final startingPrice = treatment.startingPrice;
     final fallbackImage = Image.asset(
       _kCardFallback,
       fit: BoxFit.cover,
@@ -361,11 +362,12 @@ class TreatmentPhotoCard extends StatelessWidget {
                       spacing: _pillGap,
                       runSpacing: 6,
                       children: [
-                        _Pill(
-                          text: _startingFrom(treatment),
-                          color: _kPricePill,
-                          minWidth: 155.844,
-                        ),
+                        if (startingPrice != null)
+                          _Pill(
+                            text: _startingFrom(startingPrice),
+                            color: _kPricePill,
+                            minWidth: 155.844,
+                          ),
                         _Pill(
                           text: 'Order Now',
                           color: _kOrderPill,

@@ -2,14 +2,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/timezone_helper.dart';
+import '../../../chat/presentation/providers/chat_providers.dart';
 import '../../domain/entities/booking_detail_data.dart';
 import '../../domain/entities/booking_record.dart';
 import '../providers/booking_providers.dart';
@@ -41,7 +41,14 @@ class BookingDetailPage extends ConsumerWidget {
             )
           : state.detail == null
           ? const Center(child: Text('No data found'))
-          : _DetailBody(detail: state.detail!, realtimeStatus: rawStatus),
+          : _DetailBody(
+              detail: state.detail!,
+              realtimeStatus: rawStatus,
+              // A therapist assigned after the page loaded shows up live.
+              therapistAssigned:
+                  state.detail!.therapistId != null ||
+                  streamAsync.value?['therapist_id'] != null,
+            ),
       bottomNavigationBar:
           state.detail != null &&
               rawStatus == 'completed' &&
@@ -92,7 +99,12 @@ class BookingDetailPage extends ConsumerWidget {
 class _DetailBody extends StatelessWidget {
   final BookingDetailData detail;
   final String realtimeStatus;
-  const _DetailBody({required this.detail, required this.realtimeStatus});
+  final bool therapistAssigned;
+  const _DetailBody({
+    required this.detail,
+    required this.realtimeStatus,
+    required this.therapistAssigned,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -131,12 +143,10 @@ class _DetailBody extends StatelessWidget {
         _SectionLabel(label: 'YOUR THERAPIST'),
         const SizedBox(height: 8),
         _TherapistSection(detail: detail),
-        if (detail.therapistPhone != null &&
-            detail.therapistPhone!.isNotEmpty &&
-            realtimeStatus != 'pending' &&
-            realtimeStatus != 'cancelled') ...[
+        // In-app chat (read-only once completed / cancelled).
+        if (therapistAssigned) ...[
           const SizedBox(height: 10),
-          _WhatsAppButton(phone: detail.therapistPhone!),
+          _ChatButton(bookingId: detail.bookingId),
         ],
         const SizedBox(height: 12),
 
@@ -414,36 +424,62 @@ class _TherapistSection extends StatelessWidget {
   }
 }
 
-// ── WhatsApp button ────────────────────────────────────────────────────────────
+// ── Chat button ────────────────────────────────────────────────────────────────
 
-class _WhatsAppButton extends StatelessWidget {
-  final String phone;
-  const _WhatsAppButton({required this.phone});
-
-  Future<void> _launch() async {
-    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final waPhone = clean.startsWith('0') ? '62${clean.substring(1)}' : clean;
-    final url = Uri.parse('https://wa.me/$waPhone');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
-  }
+/// Opens the in-app chat with the booking's therapist; badge = unread count.
+class _ChatButton extends ConsumerWidget {
+  final String bookingId;
+  const _ChatButton({required this.bookingId});
 
   @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: _launch,
-      icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
-      label: const Text(
-        'Chat Therapist',
-        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref
+        .watch(chatUnreadCountProvider(bookingId))
+        .maybeWhen(data: (n) => n, orElse: () => 0);
+
+    return ElevatedButton(
+      onPressed: () => context.push('/chat/$bookingId'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF25D366),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 46),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'Chat with Therapist',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          if (unread > 0) ...[
+            const SizedBox(width: 8),
+            Semantics(
+              label: '$unread unread',
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 20),
+                height: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD32F2F),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  unread > 99 ? '99+' : '$unread',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
