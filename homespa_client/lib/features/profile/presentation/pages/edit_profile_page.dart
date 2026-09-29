@@ -84,6 +84,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       ).showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty ||
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A valid email is required')),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
 
@@ -111,7 +119,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
     final result = await ref
         .read(authRepositoryProvider)
-        .updateProfile(name: name, email: _emailCtrl.text.trim(), gender: _gender);
+        .updateProfile(name: name, email: email, gender: _gender);
     await ref.read(authNotifierProvider.notifier).refreshUser();
     if (!mounted) return;
     setState(() => _isSaving = false);
