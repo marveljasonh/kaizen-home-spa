@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/florian_text.dart';
 import '../../domain/entities/treatment_category.dart';
 import '../providers/treatments_providers.dart';
 import '../widgets/cart_glass_button.dart';
@@ -263,7 +264,7 @@ class _CategoryCard extends StatelessWidget {
                     // Long category names shrink to fit rather than clip.
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
+                      child: FlorianText(
                         title!,
                         textAlign: TextAlign.center,
                         style: _categoryTitleStyle(),

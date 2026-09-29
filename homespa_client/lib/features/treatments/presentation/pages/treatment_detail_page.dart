@@ -4,28 +4,36 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/utils/currency_formatter.dart';
+import '../../../../../core/widgets/florian_text.dart';
 import '../../domain/entities/treatment.dart';
 import '../../domain/entities/treatment_duration.dart';
 import '../providers/treatments_providers.dart';
 import '../widgets/glass_icon_button.dart';
 
-// ── Assets exported from Figma (kaizen › fullbodya, node 1626:4620) ───────────
+// ── Assets exported from Figma (kaizen › fullbodya, node 1626:4539) ───────────
 const String _kHeroFallback = 'assets/images/treatments/detail_hero.png';
 const String _kIconBack = 'assets/icons/chevron_left_33.svg';
+const String _kIconCheck = 'assets/icons/check_circle_17.svg'; // 45% built in
 
 // ── Figma values (402pt-wide frame) ──────────────────────────────────────────
 const double _kSide = 29;
-// Figma's content right edge is x 378 (cards and button), i.e. 24 from the
-// right, while text starts 29 from the left.
-const double _kSideRight = 24;
+// Cards end at x 372, i.e. 30 from the right, while text starts 29 in.
+const double _kSideRight = 30;
 const double _kHeroMinHeight = 379;
 const Color _kBg = Color(0xFF4E523B);
-const Color _kBar = Color(0xFF313129);
+
+/// "What's Included?" rows (Figma 1626:4581 – 4589).
+const List<String> _kIncluded = [
+  'Certified professional therapist',
+  'All equipment & supplies provided',
+  'Post-treatment care tips',
+];
 
 /// Figma's "normal" line height for Montserrat (ascent + descent). Flutter's
 /// default adds the font's line gap (~1.41), which drifts vertical spacing.
@@ -70,7 +78,7 @@ class _DetailBody extends ConsumerWidget {
     final durations = [...treatment.durations]
       ..sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
 
-    void onAddToCart() {
+    void onContinue() {
       context
           .push(
             '/treatments/${treatment.id}/addons',
@@ -107,6 +115,7 @@ class _DetailBody extends ConsumerWidget {
                               id,
                     ),
                   ),
+                  const SliverToBoxAdapter(child: _Included()),
                 ],
               ),
               // Back button stays put while the page scrolls under it.
@@ -123,10 +132,7 @@ class _DetailBody extends ConsumerWidget {
             ],
           ),
         ),
-        _CartBar(
-          price: resolved?.price ?? treatment.displayPrice,
-          onAddToCart: onAddToCart,
-        ),
+        _ContinueBar(onTap: onContinue),
       ],
     );
   }
@@ -178,13 +184,13 @@ class _Hero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _PricePill(
-                  text: 'Starting from ${formatIdrK(treatment.startingPrice)}',
-                ),
-                const SizedBox(height: 4.725 + 5.52),
+                if (treatment.startingPrice case final price?) ...[
+                  _PricePill(text: 'Starting from ${formatIdrK(price)}'),
+                  const SizedBox(height: 4.725 + 5.52),
+                ],
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 269),
-                  child: Text(
+                  child: FlorianText(
                     treatment.name,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -268,8 +274,8 @@ class _TreatmentOptions extends StatelessWidget {
     required this.onSelected,
   });
 
-  static const double _colGap = 17; // cards at x 29 and 212
-  static const double _rowGap = 17; // rows at y 461 and 593
+  static const double _colGap = 11; // cards at x 29 and 206
+  static const double _rowGap = 9; // rows at y 461 and 577
 
   @override
   Widget build(BuildContext context) {
@@ -298,8 +304,7 @@ class _TreatmentOptions extends StatelessWidget {
 
     // Title 400.43 (21.43 below hero) → subtitle 424 → grid 461.
     return Padding(
-      // Grid ends 708; the price bar starts at 740.
-      padding: const EdgeInsets.fromLTRB(_kSide, 21.43, _kSideRight, 32),
+      padding: const EdgeInsets.fromLTRB(_kSide, 21.43, _kSideRight, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -314,6 +319,8 @@ class _TreatmentOptions extends StatelessWidget {
   }
 }
 
+/// 166 × 107 duration card: minutes, label and a price chip. Selected: dark
+/// gradient with a white 50% hairline; otherwise a 15% grey-olive fill.
 class _OptionCard extends StatelessWidget {
   final TreatmentDuration duration;
   final bool selected;
@@ -325,164 +332,223 @@ class _OptionCard extends StatelessWidget {
     required this.onTap,
   });
 
-  // CSS 154.02° gradient direction as a unit vector (x right, y down).
-  static final double _dx = math.sin(154.02 * math.pi / 180);
-  static final double _dy = -math.cos(154.02 * math.pi / 180);
+  // CSS 155.608° gradient direction as a unit vector (x right, y down).
+  static final double _dx = math.sin(155.608 * math.pi / 180);
+  static final double _dy = -math.cos(155.608 * math.pi / 180);
 
-  static const double _border = 0.563;
+  static const Color _from = Color(0xFF353A30);
+  static const Color _to = Color(0xFF3D402F);
+
+  /// Figma stops are 14.802% → 103.17%; Flutter's end at 100% is the colour
+  /// 96.4% of the way along.
+  static final Color _toAtEnd = Color.lerp(
+    _from,
+    _to,
+    (1 - 0.14802) / (1.0317 - 0.14802),
+  )!;
+
+  static const double _border = 0.5;
 
   @override
   Widget build(BuildContext context) {
-    // Figma offsets from the card's outer edge: minutes (19, 58.67), label
-    // (19, 86.59). Subtract the border, which Container adds as padding.
-    const left = 19 - _border;
+    // Figma offsets from the card's outer edge; the border (kept on both
+    // states so nothing shifts) is added by Container as padding.
+    const left = 18 - _border;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 115,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10.016),
-          // Border on both states keeps content from shifting.
-          border: Border.all(
-            color: selected
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.transparent,
-            width: _border,
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 107,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8.891),
+            border: Border.all(
+              color: selected
+                  ? Colors.white.withValues(alpha: 0.5)
+                  : Colors.transparent,
+              width: _border,
+            ),
+            color: selected ? null : const Color(0x26BCBDB5), // 15%
+            gradient: selected
+                ? LinearGradient(
+                    begin: Alignment(-_dx, -_dy),
+                    end: Alignment(_dx, _dy),
+                    colors: [_from, _toAtEnd],
+                    stops: const [0.14802, 1.0],
+                  )
+                : null,
           ),
-          color: selected ? null : const Color(0x26BCBDB5), // 15%
-          gradient: selected
-              ? LinearGradient(
-                  begin: Alignment(-_dx, -_dy),
-                  end: Alignment(_dx, _dy),
-                  colors: const [Color(0xFF353A30), Color(0xFF3D402F)],
-                  stops: const [0.148, 1.0],
-                )
-              : null,
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: 58.67 - _border,
-              left: left,
-              right: 8,
-              child: Text(
-                '${duration.durationMinutes} MIN',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.montserrat(
-                  fontSize: 22.295,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  height: _kFigmaNormal,
+          child: Stack(
+            children: [
+              Positioned(
+                top: 13 - _border,
+                left: left,
+                right: 8,
+                child: Text(
+                  '${duration.durationMinutes} MIN',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 21.713,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: _kFigmaNormal,
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 86.59 - _border,
-              left: left,
-              right: 8,
-              child: Text(
-                'Signature Treatment',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.montserrat(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w400,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.white,
-                  height: _kFigmaNormal,
+              Positioned(
+                top: 41 - _border,
+                left: left,
+                right: 8,
+                child: Text(
+                  'Signature Treatment',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white,
+                    height: _kFigmaNormal,
+                  ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                top: 66 - _border,
+                left: left,
+                child: _PriceChip(price: duration.price, selected: selected),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Price bar + Add To Cart ──────────────────────────────────────────────────
-
-class _CartBar extends StatelessWidget {
+/// 89.888 × 27.546 chip, radius 4.461: "IDR" Regular + amount SemiBold.
+class _PriceChip extends StatelessWidget {
   final double price;
-  final VoidCallback onAddToCart;
-  const _CartBar({required this.price, required this.onAddToCart});
+  final bool selected;
+  const _PriceChip({required this.price, required this.selected});
 
   @override
   Widget build(BuildContext context) {
-    // Figma bar: y 740–854 (114 tall). Button 196×54 at y 760 (20 in), so 40
-    // below it — 6 + a 34pt home-indicator area.
-    final inset = MediaQuery.paddingOf(context).bottom;
-    final double bottom = 6 + math.max(inset, 34.0);
+    // "IDR 195K" → "IDR" + " 195K".
+    final label = formatIdrK(price);
+    final amount = label.startsWith('IDR') ? label.substring(3) : ' $label';
+    TextStyle style(FontWeight w) => GoogleFonts.montserrat(
+      fontSize: 13.383,
+      fontWeight: w,
+      color: Colors.white,
+      height: _kFigmaNormal,
+    );
 
     return Container(
-      color: _kBar,
-      padding: EdgeInsets.fromLTRB(_kSide, 20, _kSideRight, bottom),
-      child: Row(
+      constraints: const BoxConstraints(minWidth: 89.888),
+      height: 27.546,
+      padding: const EdgeInsets.symmetric(horizontal: 4.461),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFF5B6240) : const Color(0xFF50543E),
+        borderRadius: BorderRadius.circular(4.461),
+      ),
+      child: Center(
+        widthFactor: 1,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: 'IDR', style: style(FontWeight.w400)),
+              TextSpan(text: amount, style: style(FontWeight.w600)),
+            ],
+          ),
+          maxLines: 1,
+        ),
+      ),
+    );
+  }
+}
+
+// ── What's Included? ─────────────────────────────────────────────────────────
+
+class _Included extends StatelessWidget {
+  const _Included();
+
+  @override
+  Widget build(BuildContext context) {
+    // Grid ends 684 → title 708 → rows 738 / 766 / 793 (16 tall) → the
+    // button 24 below the last row.
+    const rowGaps = [12.0, 11.0];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_kSide, 24, _kSideRight, 24),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            // "Price Treatment" at y 763 (3 below the button top).
-            padding: const EdgeInsets.only(top: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          _SectionTitle('What’s Included?'),
+          const SizedBox(height: 738 - (708 + 16 * _kFigmaNormal)),
+          for (var i = 0; i < _kIncluded.length; i++) ...[
+            if (i > 0) SizedBox(height: rowGaps[(i - 1) % rowGaps.length]),
+            Row(
               children: [
-                Text(
-                  'Price Treatment',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.montserrat(
-                    fontSize: 14.323,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white,
-                    height: _kFigmaNormal,
+                // 16 box; the exported icon draws 17 (stroke outside).
+                SizedBox.square(
+                  dimension: 16,
+                  child: OverflowBox(
+                    maxWidth: 17,
+                    maxHeight: 17,
+                    child: SvgPicture.asset(_kIconCheck, width: 17, height: 17),
                   ),
                 ),
-                const SizedBox(height: 0.73), // price at y 781.19
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    formatIdrK(price),
-                    maxLines: 1,
-                    style: GoogleFonts.montserrat(
-                      fontSize: 22.728,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      height: _kFigmaNormal,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: 9),
+                Expanded(child: _Muted(_kIncluded[i])),
               ],
             ),
-          ),
-          const SizedBox(width: 12),
-          // 196 wide at Figma size; on narrow screens the button gives up
-          // width before the price label does.
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 196),
-                child: Material(
-                  color: _kBg,
-                  borderRadius: BorderRadius.circular(9.464),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(9.464),
-                    onTap: onAddToCart,
-                    child: SizedBox(
-                      height: 54,
-                      child: Center(
-                        child: Text(
-                          'Add To Cart',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 15.143,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Continue ─────────────────────────────────────────────────────────────────
+
+/// Figma button: #2C2C2C, 344 × 49 centred (29 in), radius 9.464, 34 above
+/// the frame bottom (home-indicator area).
+class _ContinueBar extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ContinueBar({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.paddingOf(context).bottom;
+    final radius = BorderRadius.circular(9.464);
+    return ColoredBox(
+      color: _kBg,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(_kSide, 0, _kSide, math.max(inset, 34)),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 344),
+            child: Material(
+              color: const Color(0xFF2C2C2C),
+              borderRadius: radius,
+              child: InkWell(
+                borderRadius: radius,
+                onTap: onTap,
+                child: SizedBox(
+                  height: 49,
+                  width: double.infinity,
+                  child: Center(
+                    child: Text(
+                      'Continue',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 15.143,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 0.85155,
                       ),
                     ),
                   ),
@@ -490,7 +556,7 @@ class _CartBar extends StatelessWidget {
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

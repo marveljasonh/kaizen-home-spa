@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/widgets/florian_text.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 
 // Welcome (Figma kaizen › splash, 1653:4369, 393×852). Shown once, right
@@ -150,7 +151,7 @@ class _WelcomePageState extends ConsumerState<WelcomePage>
                 child: _enter(
                   const SizedBox(
                     width: _kHeadlineWidth,
-                    child: Text(
+                    child: FlorianText(
                       'Your Relaxation\nExperience Starts\nHere',
                       textAlign: TextAlign.center,
                       style: TextStyle(

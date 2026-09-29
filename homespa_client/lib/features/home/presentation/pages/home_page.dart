@@ -193,7 +193,7 @@ class _HeroSection extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _HeroButton(
-                      label: 'Order Service',
+                      label: 'Book Now',
                       fontSize: 18,
                       background: AppColors.darkOliveLight,
                       foreground: Colors.white,
@@ -593,7 +593,11 @@ class _RecentOrdersSection extends ConsumerWidget {
                 itemCount: orders.length,
                 itemBuilder: (_, i) => Padding(
                   padding: const EdgeInsets.only(right: _kOrderCardGap),
-                  child: OrderCard(order: orders[i], width: _kOrderCardWidth),
+                  child: OrderCard(
+                    order: orders[i],
+                    width: _kOrderCardWidth,
+                    showStatus: true,
+                  ),
                 ),
               ),
             );

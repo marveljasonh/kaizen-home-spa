@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,7 @@ const String _kIconFilter = 'assets/icons/filter_49.svg'; // Frame 33620
 const double _kGutterLeft = 30;
 const double _kGutterRight = 31; // tabs and search end at x 371 of 402
 const double _kCardGap = 14;
+const double _kVoucherGap = 12;
 
 // ── Hero (Figma 1650:2680 – 1650:2695) ───────────────────────────────────────
 const double _kHeroHeight = 219;
@@ -452,15 +454,20 @@ class _PromoPageState extends ConsumerState<PromoPage>
                 ),
               ];
             }
+            // Active first, then Used, then Expired (stable within each).
+            final sorted = [
+              for (final status in _VoucherStatus.values)
+                ...vouchers.where((cv) => _voucherStatus(cv) == status),
+            ];
             return [
-              for (final cv in vouchers) ...[
+              for (final cv in sorted) ...[
                 _Gutter(
                   _VoucherCard(
                     data: cv,
                     onUse: (code) => _usePromoVoucher(code),
                   ),
                 ),
-                const SizedBox(height: _kCardGap),
+                const SizedBox(height: _kVoucherGap),
               ],
             ];
           },
@@ -1159,28 +1166,6 @@ class _StatusPill extends StatelessWidget {
   );
 }
 
-/// "#CODE" tag: white 20% fill, hairline white border.
-class _CodeTag extends StatelessWidget {
-  final String code;
-  const _CodeTag(this.code);
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.2),
-      borderRadius: BorderRadius.circular(_kTagRadius),
-      border: Border.all(color: Colors.white, width: 0.3),
-    ),
-    child: Text(
-      code,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: flowBody(12, weight: FontWeight.w500).copyWith(letterSpacing: 0.8),
-    ),
-  );
-}
-
 /// Small olive action (Re-Order style), 44px tall for an easy tap target.
 class _PillButton extends StatelessWidget {
   final String label;
@@ -1229,26 +1214,22 @@ class _PillButton extends StatelessWidget {
 /// Gold-tinted square behind an icon.
 class _IconTile extends StatelessWidget {
   final IconData icon;
-  final bool muted;
-  const _IconTile(this.icon, {this.muted = false});
+  const _IconTile(this.icon);
 
   @override
   Widget build(BuildContext context) => Container(
     width: 44,
     height: 44,
     decoration: BoxDecoration(
-      color: (muted ? Colors.white : _kGold).withValues(alpha: 0.15),
+      color: _kGold.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(_kButtonRadius),
-      border: Border.all(
-        color: (muted ? Colors.white : _kGold).withValues(alpha: 0.35),
-        width: 0.5,
-      ),
+      border: Border.all(color: _kGold.withValues(alpha: 0.35), width: 0.5),
     ),
-    child: Icon(icon, size: 22, color: muted ? _kMuted : _kGold),
+    child: Icon(icon, size: 22, color: _kGold),
   );
 }
 
-/// "Free Full Body Massage 90 min", "20% discount", "Rp 20.000 discount".
+/// "Free Full Body Massage - 90 min", "50% off your order", "Rp 20.000 off".
 String _rewardBenefit(Map<String, dynamic> reward) {
   final type = reward['reward_type'] as String?;
   final value = (reward['reward_value'] as num?)?.toDouble() ?? 0;
@@ -1259,13 +1240,81 @@ String _rewardBenefit(Map<String, dynamic> reward) {
           'Treatment';
       final duration =
           (reward['reward_duration'] as Map?)?['duration_minutes'] as int?;
-      return duration != null ? 'Free $name $duration min' : 'Free $name';
+      return duration != null ? 'Free $name - $duration min' : 'Free $name';
     case 'discount_percentage':
-      return '${value.toInt()}% discount';
+      return '${value.toInt()}% off your order';
     case 'discount_flat':
-      return '${formatRupiah(value)} discount';
+      return '${formatRupiah(value)} off';
     default:
       return reward['description'] as String? ?? 'Special reward';
+  }
+}
+
+/// Rules the booking code enforces (reward_redemptions / booking_cart /
+/// createBooking): points go on redeem, free treatments are added to the cart
+/// and replace any voucher, discounts are picked at the voucher step and need
+/// paid items, and the redemption is marked used when the booking is placed.
+List<String> _rewardHowItWorks(Map<String, dynamic> reward) {
+  final isFree = reward['reward_type'] == 'free_treatment';
+  return [
+    'Points are deducted as soon as you redeem.',
+    isFree
+        ? 'Tap Use in My Rewards to add it to your cart. It replaces any voucher.'
+        : 'Apply it at the voucher step when you book paid treatments.',
+    'Single use: it’s used up when you place the booking.',
+  ];
+}
+
+// ── Reward images ─────────────────────────────────────────────────────────────
+
+/// Bundled fallback when neither the reward nor its treatment has a photo.
+const String _kRewardFallbackImage = _kBannerFallbackImage;
+
+/// rewards.image_url → the free treatment's image_url → bundled default.
+String? _rewardImageUrl(Map<String, dynamic> reward) {
+  for (final key in ['image_url', 'reward_treatment_image_url']) {
+    final url = (reward[key] as String?)?.trim();
+    if (url != null && url.isNotEmpty) return url;
+  }
+  return null;
+}
+
+/// Reward photo (or the bundled default) under a clear → #313129 85% gradient.
+class _RewardImage extends StatelessWidget {
+  final Map<String, dynamic> reward;
+  const _RewardImage(this.reward);
+
+  @override
+  Widget build(BuildContext context) {
+    const fallback = Image(
+      image: AssetImage(_kRewardFallbackImage),
+      fit: BoxFit.cover,
+    );
+    final url = _rewardImageUrl(reward);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: AppColors.secondary),
+        if (url != null)
+          CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => const SizedBox.shrink(),
+            errorWidget: (_, _, _) => fallback,
+          )
+        else
+          fallback,
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00313129), Color(0xD9313129)], // → 85%
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1454,103 +1503,450 @@ class _BannerCard extends StatelessWidget {
 
 // ── My Vouchers card ──────────────────────────────────────────────────────────
 
+enum _VoucherStatus { active, used, expired }
+
+DateTime? _voucherExpiry(Map<String, dynamic> v) {
+  final raw = (v['expires_at'] ?? v['valid_until']) as String?;
+  return raw == null ? null : DateTime.tryParse(raw);
+}
+
+/// Same rules as before: used wins over expired.
+_VoucherStatus _voucherStatus(Map<String, dynamic> cv) {
+  final v = (cv['voucher'] as Map<String, dynamic>?) ?? {};
+  if (cv['is_used'] == true || cv['used_at'] != null) {
+    return _VoucherStatus.used;
+  }
+  final expiry = _voucherExpiry(v);
+  if (expiry != null && expiry.isBefore(DateTime.now())) {
+    return _VoucherStatus.expired;
+  }
+  return _VoucherStatus.active;
+}
+
+/// "Rp 20K", "Rp 1.5M", "Rp 500".
+String _compactRupiah(double value) {
+  String trim(double n) =>
+      n == n.roundToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(1);
+  if (value >= 1000000) return 'Rp ${trim(value / 1000000)}M';
+  if (value >= 1000) return 'Rp ${trim(value / 1000)}K';
+  return 'Rp ${value.toStringAsFixed(0)}';
+}
+
+const Color _kAmber = Color(0xFFF5B942);
+
+/// Voucher info lines (min. purchase, validity): white 60%.
+const Color _kVoucherInfo = Color(0x99FFFFFF);
+
+/// Fixed so "Use" / "Used" / "Expired" never resize the bottom row.
+const double _kVoucherButtonWidth = 100;
+
+/// Ticket-style voucher: gold discount panel, dashed divider with notches,
+/// details on the right. Used / expired vouchers are dimmed and desaturated.
 class _VoucherCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final ValueChanged<String> onUse;
   const _VoucherCard({required this.data, required this.onUse});
 
+  static const double _notch = 8;
+
+  /// Greyscale (luminance) filter for used / expired vouchers.
+  static const ColorFilter _desaturate = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0, 0, 0, 1, 0,
+  ]);
+
   @override
   Widget build(BuildContext context) {
     final v = (data['voucher'] as Map<String, dynamic>?) ?? {};
     final code = (v['code'] as String?) ?? '';
-    final description = v['description'] as String?;
-
     final type = v['discount_type'] as String?;
     final value = (v['discount_value'] as num?)?.toDouble() ?? 0;
-    final discount = switch (type) {
-      'percentage' => '${value.toInt()}% OFF',
-      'flat' => '${formatRupiah(value)} OFF',
+    final expiry = _voucherExpiry(v);
+    final minOrder = (v['min_order_amount'] as num?)?.toDouble();
+    final status = _voucherStatus(data);
+    final usable = status == _VoucherStatus.active && code.isNotEmpty;
+
+    // Left panel label.
+    final (String big, String small) = switch (type) {
+      'percentage' => ('${value.toInt()}%', 'OFF'),
+      'flat' => (_compactRupiah(value), 'OFF'),
+      _ => ('Voucher', ''),
+    };
+
+    // Title: the voucher's own text, else what it gives.
+    final title = [
+      v['title'] as String?,
+      v['description'] as String?,
+    ].firstWhere((t) => t != null && t.trim().isNotEmpty, orElse: () => null);
+    final fallbackTitle = switch (type) {
+      'percentage' => '${value.toInt()}% off your order',
+      'flat' => '${formatRupiah(value)} off your order',
       _ => 'Voucher',
     };
 
-    final expiryRaw = (v['expires_at'] ?? v['valid_until']) as String?;
-    final expiry = expiryRaw == null ? null : DateTime.tryParse(expiryRaw);
-    final isExpired = expiry?.isBefore(DateTime.now()) ?? false;
-    final isUsed = data['is_used'] == true || data['used_at'] != null;
-    final minOrder = (v['min_order_amount'] as num?)?.toDouble();
+    final (String statusLabel, Color statusColor) = switch (status) {
+      _VoucherStatus.active => ('Active', _kActive),
+      _VoucherStatus.used => ('Used', _kMuted),
+      _VoucherStatus.expired => ('Expired', _kExpired),
+    };
 
-    final (String status, Color statusColor) = isUsed
-        ? ('Used', _kMuted)
-        : isExpired
-        ? ('Expired', _kExpired)
-        : ('Active', _kActive);
-    final usable = !isUsed && !isExpired && code.isNotEmpty;
+    // Expiry line: amber countdown when 3 days or fewer remain.
+    final localExpiry = expiry?.toLocal();
+    final daysLeft = localExpiry == null
+        ? null
+        : DateUtils.dateOnly(
+            localExpiry,
+          ).difference(DateUtils.dateOnly(DateTime.now())).inDays;
+    final expiringSoon =
+        status == _VoucherStatus.active && daysLeft != null && daysLeft <= 3;
+    final expiryDate = localExpiry == null
+        ? null
+        : DateFormat('d MMM y').format(localExpiry);
 
-    final details = [
-      if (minOrder != null && minOrder > 0)
-        'Min. purchase ${formatRupiah(minOrder)}',
-      if (expiry != null)
-        '${isExpired ? 'Expired' : 'Valid until'} '
-            '${DateFormat('d MMM y').format(expiry.toLocal())}',
-    ];
+    Widget ticket = LayoutBuilder(
+      builder: (context, constraints) {
+        final split = (constraints.maxWidth * 0.30).clamp(92.0, 124.0);
+        return CustomPaint(
+          painter: _TicketPainter(
+            split: split,
+            radius: _kCardRadius,
+            notch: _notch,
+          ),
+          child: ClipPath(
+            clipper: _TicketClipper(
+              split: split,
+              radius: _kCardRadius,
+              notch: _notch,
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Discount panel ─────────────────────────────────────
+                  SizedBox(
+                    width: split,
+                    child: Padding(
+                      // ≥ 4 clear of the notch on the divider side.
+                      padding: const EdgeInsets.fromLTRB(
+                        10,
+                        16,
+                        _notch + 6,
+                        16,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.local_offer_outlined,
+                            size: 18,
+                            color: _kGold,
+                          ),
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              big,
+                              maxLines: 1,
+                              style: flowHeading(
+                                30,
+                                color: _kGold,
+                                height: 1.05,
+                              ),
+                            ),
+                          ),
+                          if (small.isNotEmpty)
+                            Text(
+                              small,
+                              style: flowHeading(
+                                13,
+                                color: _kGold,
+                                height: 1.2,
+                              ).copyWith(letterSpacing: 1.5),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-    return Opacity(
-      opacity: usable ? 1 : 0.6,
-      child: _GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                  // ── Details ────────────────────────────────────────────
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _notch + 10,
+                        14,
+                        14,
+                        14,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title ?? fallbackTitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: flowHeading(16, height: 1.25),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _StatusPill(statusLabel, statusColor),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          if (minOrder != null && minOrder > 0)
+                            _VoucherDetail(
+                              icon: Icons.shopping_bag_outlined,
+                              text: 'Min. purchase ${formatRupiah(minOrder)}',
+                            ),
+                          if (expiryDate != null)
+                            _VoucherDetail(
+                              icon: expiringSoon
+                                  ? Icons.timer_outlined
+                                  : Icons.event_outlined,
+                              color: expiringSoon
+                                  ? _kAmber
+                                  : _kVoucherInfo,
+                              text: switch (status) {
+                                _VoucherStatus.expired => 'Expired $expiryDate',
+                                _ when expiringSoon =>
+                                  daysLeft <= 0
+                                      ? 'Expires today'
+                                      : 'Expires in $daysLeft day${daysLeft == 1 ? '' : 's'}',
+                                _ => 'Valid until $expiryDate',
+                              },
+                            ),
+                          const SizedBox(height: 10),
+                          // Code pill shrinks (ellipsis); the button keeps
+                          // its width so the row never wraps or overflows.
+                          Row(
+                            children: [
+                              Expanded(
+                                child: code.isEmpty
+                                    ? const SizedBox.shrink()
+                                    : Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: _CopyCodePill(code: code),
+                                      ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: _kVoucherButtonWidth,
+                                child: _PillButton(
+                                  label: switch (status) {
+                                    _VoucherStatus.active => 'Use',
+                                    _VoucherStatus.used => 'Used',
+                                    _VoucherStatus.expired => 'Expired',
+                                  },
+                                  onTap: usable ? () => onUse(code) : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (status != _VoucherStatus.active) {
+      ticket = Opacity(
+        opacity: 0.55,
+        child: ColorFiltered(colorFilter: _desaturate, child: ticket),
+      );
+    }
+    return ticket;
+  }
+}
+
+/// Muted detail line with a leading icon; wraps instead of clipping.
+class _VoucherDetail extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  const _VoucherDetail({
+    required this.icon,
+    required this.text,
+    this.color = _kVoucherInfo,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(text, style: flowBody(12, color: color, height: 1.35)),
+        ),
+      ],
+    ),
+  );
+}
+
+/// "#CODE"-style outlined pill with a copy icon; copies the code.
+class _CopyCodePill extends StatelessWidget {
+  final String code;
+  const _CopyCodePill({required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Copy code $code',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: code));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Code copied')));
+        },
+        // Taller hit area than the pill itself (≈ 44).
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(_kTagRadius),
+              border: Border.all(color: Colors.white, width: 0.3),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
+                Flexible(
                   child: Text(
-                    discount,
-                    style: flowHeading(24, height: 1.1),
+                    code,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: flowBody(
+                      12,
+                      weight: FontWeight.w500,
+                    ).copyWith(letterSpacing: 0.8),
                   ),
                 ),
-                const SizedBox(width: 10),
-                _StatusPill(status, statusColor),
+                const SizedBox(width: 6),
+                const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
               ],
             ),
-            if (description != null && description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: flowBody(12.5, color: Colors.white70, height: 1.35),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (code.isNotEmpty) _CodeTag(code),
-                      for (final line in details) ...[
-                        const SizedBox(height: 6),
-                        Text(line, style: flowBody(12, color: _kMuted)),
-                      ],
-                    ],
-                  ),
-                ),
-                if (usable) ...[
-                  const SizedBox(width: 12),
-                  _PillButton(label: 'Use', onTap: () => onUse(code)),
-                ],
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Card outline minus a notch circle at the top and bottom of the divider.
+Path _ticketPath(Size size, double split, double radius, double notch) {
+  final card = Path()
+    ..addRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
+    );
+  final notches = Path()
+    ..addOval(Rect.fromCircle(center: Offset(split, 0), radius: notch))
+    ..addOval(
+      Rect.fromCircle(center: Offset(split, size.height), radius: notch),
+    );
+  return Path.combine(PathOperation.difference, card, notches);
+}
+
+class _TicketClipper extends CustomClipper<Path> {
+  final double split;
+  final double radius;
+  final double notch;
+  const _TicketClipper({
+    required this.split,
+    required this.radius,
+    required this.notch,
+  });
+
+  @override
+  Path getClip(Size size) => _ticketPath(size, split, radius, notch);
+
+  @override
+  bool shouldReclip(_TicketClipper old) =>
+      old.split != split || old.radius != radius || old.notch != notch;
+}
+
+/// Glass fill (white 10%) with the gradient discount panel on the left,
+/// hairline white 15% outline, and a dashed divider between the notches.
+class _TicketPainter extends CustomPainter {
+  final double split;
+  final double radius;
+  final double notch;
+  const _TicketPainter({
+    required this.split,
+    required this.radius,
+    required this.notch,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shape = _ticketPath(size, split, radius, notch);
+    canvas.drawPath(
+      shape,
+      Paint()..color = Colors.white.withValues(alpha: 0.10),
+    );
+
+    canvas.save();
+    canvas.clipPath(shape);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, split, size.height),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF4E523B), Color(0xFF313129)],
+        ).createShader(Rect.fromLTWH(0, 0, split, size.height)),
+    );
+    canvas.restore();
+
+    canvas.drawPath(
+      shape,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.15),
+    );
+
+    // Dashed divider, 4 clear of each notch.
+    final dash = Paint()
+      ..color = Colors.white.withValues(alpha: 0.35)
+      ..strokeWidth = 1;
+    const dashLength = 4.0;
+    const gap = 3.0;
+    var y = notch + 4;
+    final end = size.height - notch - 4;
+    while (y < end) {
+      canvas.drawLine(
+        Offset(split, y),
+        Offset(split, (y + dashLength).clamp(0, end)),
+        dash,
+      );
+      y += dashLength + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TicketPainter old) =>
+      old.split != split || old.radius != radius || old.notch != notch;
 }
 
 // ── My Rewards card ───────────────────────────────────────────────────────────
@@ -1571,7 +1967,13 @@ class _RedemptionCard extends StatelessWidget {
       child: _GlassCard(
         child: Row(
           children: [
-            _IconTile(Icons.card_giftcard_rounded, muted: isUsed),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(_kButtonRadius),
+              child: SizedBox.square(
+                dimension: 64,
+                child: _RewardImage(reward),
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -1669,6 +2071,8 @@ class _RewardCard extends StatelessWidget {
     required this.onRedeem,
   });
 
+  static const double _imageHeight = 140;
+
   @override
   Widget build(BuildContext context) {
     final pointsRequired = (reward['points_required'] as int?) ?? 0;
@@ -1677,50 +2081,166 @@ class _RewardCard extends StatelessWidget {
         ? (totalPoints / pointsRequired).clamp(0.0, 1.0)
         : 1.0;
     final title = (reward['title'] as String?) ?? '';
+    final radius = Radius.circular(_kCardRadius);
 
-    return _GlassCard(
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.all(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: Text(title, style: flowHeading(18, height: 1.2))),
-              const SizedBox(width: 10),
-              _StatusPill('$pointsRequired pts', _kGold),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _rewardBenefit(reward),
-            style: flowBody(13, color: Colors.white70, height: 1.3),
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: Colors.white.withValues(alpha: 0.15),
-              valueColor: const AlwaysStoppedAnimation(_kGold),
+          // ── Image: points pill top right, title over the bottom ───────────
+          SizedBox(
+            height: _imageHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _RewardImage(reward),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: _PointsPill(pointsRequired),
+                ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 12,
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: flowHeading(22, height: 1.15),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${totalPoints.clamp(0, pointsRequired)} / $pointsRequired pts',
-            style: flowBody(11.5, color: _kMuted),
-          ),
-          const SizedBox(height: 14),
-          _RedeemButton(
-            label: canRedeem
-                ? 'Redeem'
-                : 'Need ${pointsRequired - totalPoints} more pts',
-            onTap: canRedeem ? onRedeem : null,
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── What you get ─────────────────────────────────────────────
+                Text(
+                  'What you get',
+                  style: flowBody(11, weight: FontWeight.w500, color: _kMuted),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _rewardBenefit(reward),
+                  style: flowBody(15, weight: FontWeight.w600, height: 1.3),
+                ),
+                const SizedBox(height: 14),
+
+                // ── How it works ─────────────────────────────────────────────
+                Text(
+                  'How it works',
+                  style: flowBody(11, weight: FontWeight.w500, color: _kMuted),
+                ),
+                const SizedBox(height: 4),
+                for (final line in _rewardHowItWorks(reward))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, right: 8),
+                          child: Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                              color: _kGold,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            line,
+                            style: flowBody(
+                              12.5,
+                              color: Colors.white70,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
+
+                // ── Progress ─────────────────────────────────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    valueColor: const AlwaysStoppedAnimation(_kGold),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${totalPoints.clamp(0, pointsRequired)} / $pointsRequired pts',
+                  style: flowBody(11.5, color: _kMuted),
+                ),
+                const SizedBox(height: 14),
+                _RedeemButton(
+                  label: canRedeem
+                      ? 'Redeem'
+                      : 'Need ${pointsRequired - totalPoints} more pts',
+                  onTap: canRedeem ? onRedeem : null,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Gold points pill over the reward image.
+class _PointsPill extends StatelessWidget {
+  final int points;
+  const _PointsPill(this.points);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: _kGold,
+      borderRadius: BorderRadius.circular(_kTagRadius),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x40000000),
+          blurRadius: 6,
+          offset: Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, size: 14, color: AppColors.secondary),
+        const SizedBox(width: 4),
+        Text(
+          '$points pts',
+          style: flowBody(
+            12,
+            weight: FontWeight.w600,
+            color: AppColors.secondary,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// White primary button when [onTap] is set; muted glass when disabled.
