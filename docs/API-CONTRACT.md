@@ -32,8 +32,8 @@ should collect **name + phone + password** (email optional, stored on profile).
 |---|---|
 | `auth.signUp` (email) | `POST /auth/register` `{name, phone, password, referralCode?}` → `{token, userId, customerId, name, phone}`. Claims legacy accounts by phone. |
 | `auth.signInWithPassword` | `POST /auth/login` `{phone, password}` → same shape. |
-| `auth.currentUser` (29 sites) | Read cached profile + token from secure storage; refresh via `GET /customers/{customerId}/profile` *(NEW — being added)*. |
-| `auth.updateUser` | `PATCH /customers/{customerId}/profile` `{name?, email?, gender?}` *(NEW)*. |
+| `auth.currentUser` (29 sites) | Read cached profile + token from secure storage; refresh via `GET /customers/{customerId}/profile` *(live)*. |
+| `auth.updateUser` | `PATCH /customers/{customerId}/profile` `{name?, email?, gender?}` *(live)*. |
 | `auth.signOut` | Delete local token. |
 | `auth.onAuthStateChange` | App-local (token presence). |
 
@@ -49,15 +49,15 @@ should collect **name + phone + password** (email optional, stored on profile).
 }
 ```
 Mapping: `categories`→categories, `treatments`→services, `treatment_durations`→packages
-(a service has 1–4 duration/price variants), `addons`→addons *(being added to the payload)*.
+(a service has 1–4 duration/price variants), `addons`→addons *(live — payload includes `photoUrl` per package)*.
 `getTreatmentDetail(id)` = client-side lookup in this payload (it's small, cache it).
 
 ### 3. Availability & booking (`booking_remote_datasource.dart`, booking providers)
 
 | App call today | Replacement |
 |---|---|
-| read `therapist_profiles` for picker | `GET /availability?packageId&branchId&date=YYYY-MM-DD` → `{slots: [{startISO, therapistId, therapistName, label}]}` *(NEW — wraps the same engine the WhatsApp bot uses; double-booking is impossible: the DB has an exclusion constraint)*. |
-| `bookings` + `booking_items` insert | `POST /bookings` `{customerId, addressId, branchId, packageId, startISO, therapistId, paymentMethod: "cash"\|"qris"\|"va_mandiri", notes?, addonIds?, promoCode?, referralRewardId?}` → `{booking, freeAddon?}`. Add-ons ride the same call *(paid `addonIds[]` being added)*. 409 = slot just taken. |
+| read `therapist_profiles` for picker | `GET /availability?packageId&branchId&date=YYYY-MM-DD` → `{slots: [{startISO, therapistId, therapistName, label}]}` *(live — exhaustive: every free hour × therapist on the day, hours 08–22 WIB; optional `therapistId`/`addonMin` params; double-booking is impossible: the DB has an exclusion constraint)*. |
+| `bookings` + `booking_items` insert | `POST /bookings` `{customerId, addressId, branchId, packageId, startISO, therapistId, paymentMethod: "cash"\|"qris"\|"va_mandiri", notes?, addonIds?, promoCode?, referralRewardId?}` → `{booking, freeAddon?}`. Add-ons ride the same call (paid `addonIds[]`, live). `redemptionId` consumes a points reward (free package must match `packageId`; discounts cut flat IDR). 409 = slot just taken. |
 | booking history | `GET /customers/{id}/bookings` → list w/ status, schedule, package, address. |
 | booking detail / live status | `GET /bookings/{id}` (status timeline: pending→assigned→en_route→at_customer→in_progress→completed). Poll 15s. |
 | `validateVoucher(code)` | `POST /promos/validate` `{code, customerId}` → `{valid, reason?, grants?}`. KAIZENBARU = free 30-min Body Massage add-on, first app order only. |
@@ -68,49 +68,61 @@ Mapping: `categories`→categories, `treatments`→services, `treatment_duration
 |---|---|
 | `client_points` | `loyaltyPoints` on the profile payload. |
 | `client_vouchers` (referral) | `GET /customers/{id}/referral` → `{referralCode, rewards: [{id, status, addonName, ...}]}`. Redeem by passing `referralRewardId` on `POST /bookings`. |
-| `rewards`, `reward_redemptions` | `GET /rewards` + `POST /customers/{id}/reward-redemptions` *(NEW — reward = points-priced free add-on/discount; redemption issues a voucher usable on the next booking)*. |
-| `banners` | `GET /banners` *(NEW, admin-managed)*. |
+| `rewards`, `reward_redemptions` | `GET /rewards` + `POST /customers/{id}/reward-redemptions` *(live — reward = points-priced free package/discount; pass the redemption as `redemptionId` on `POST /bookings`)*. |
+| `banners` | `GET /banners` *(live, admin-managed)*. |
 | `vouchers`, `voucher_usages` | covered by `/promos/validate` + booking commit (usage counted server-side). |
 
 ### 5. Profile & addresses (`address_repository.dart`, profile pages)
 
 | App call today | Replacement |
 |---|---|
-| `saved_addresses` select/insert/delete | `GET/POST /customers/{id}/addresses`, `DELETE /customers/{id}/addresses/{addressId}` *(DELETE being added)*. Fields: label, line, city, patokan (landmark), entranceNotes, lat/lng. |
-| `profiles` select/update | `GET/PATCH /customers/{id}/profile` *(NEW)*. |
-| avatar upload (Supabase storage) | `POST /customers/{id}/avatar` (multipart → Vercel Blob) *(NEW — phase 2; ship v1 with initials avatar)*. |
+| `saved_addresses` select/insert/delete | `GET/POST /customers/{id}/addresses`, `DELETE /customers/{id}/addresses/{addressId}` *(live, incl. `PATCH .../{addressId}` for edit/set-default)*. Fields: label, line, city, patokan (landmark), entranceNotes, lat/lng. |
+| `profiles` select/update | `GET/PATCH /customers/{id}/profile` *(live)*. |
+| avatar upload (Supabase storage) | `POST /customers/{id}/avatar` (raw image bytes `image/jpeg|png|webp`, ≤3 MB, bearer auth → Vercel Blob public URL) *(live)*. |
 
 ### 6. Intake (`client_intake_page.dart`)
 
-`GET/PUT /customers/{id}/intake` *(NEW — same fields as the current `client_intake` table; stored on the platform so therapists/admin can see it)*.
+`GET/PUT /customers/{id}/intake` *(live — same fields, camelCase keys; stored on the platform so therapists/admin can see it)*.
 
 ### 7. Notifications (`notification_service.dart`)
 
-`POST /fcm-token` `{userId, token, platform}` — backend + admin push infra already live.
+`POST /push-token` `{token, platform}` (bearer auth identifies the user) — live; backend + admin push infra already in place.
 
-## Gap list (backend work on our side — none block starting the swap)
+## Gap list — all closed (2026-09-29)
 
-| Gap | Size |
+Every gap below is implemented, deployed to production, and smoke-tested.
+Extras added along the way: `POST /bookings/{id}/review` (therapist rating,
+rolls the average), `GET /promos` (active codes for the voucher list), and
+therapist id/name + `packageId` + `createdAt` on the bookings list.
+
+| Gap | Status |
 |---|---|
-| `GET /customers/{id}/profile` + `PATCH` | S |
-| `GET /availability` (expose existing slot engine) | S |
-| paid `addonIds[]` on `POST /bookings` | S |
-| addons in `GET /catalog` | XS |
-| rewards catalog + redemption | M |
-| banners | XS |
-| intake GET/PUT | S |
-| `DELETE` address | XS |
-| avatar upload | M (phase 2) |
+| `GET /customers/{id}/profile` + `PATCH` | live |
+| `GET /availability` (exhaustive hourly slot scan) | live |
+| paid `addonIds[]` + `redemptionId` on `POST /bookings` | live |
+| addons + package `photoUrl` in `GET /catalog` | live |
+| rewards catalog + redemption | live |
+| banners | live |
+| intake GET/PUT | live |
+| `DELETE` + `PATCH` address, `isDefault` | live |
+| avatar upload (Vercel Blob) | live |
 
-## Migration order (feature-by-feature, app stays shippable throughout)
+## Migration status — COMPLETE (branch `api-integration`, 2026-09-29)
 
-1. **Auth** (phone-based; unlocks everything, enables legacy account claiming)
-2. Catalog (+ per-service durations/addons)
-3. Availability + create booking (+ history/detail)
-4. Addresses
-5. Vouchers / referral / points
-6. Rewards, banners, intake
-7. Avatar upload (phase 2)
+All seven steps are implemented in homespa_client; `supabase_flutter` is
+removed from pubspec. `flutter analyze` is clean and the debug APK builds.
+
+1. **Auth** — commit 89ca312
+2. Catalog — commit 449e069
+3. Availability + booking (+ history/detail/reviews) — commit a711874
+4. Addresses — commit a711874
+5. Vouchers / referral / points — commit 7f950b3
+6. Rewards, banners, intake — commit 7f950b3
+7. Avatar upload — commit 3e924b1
+
+Platform model notes: one booking = one treatment package (checkout asks to
+book a second treatment separately); paid add-on quantities collapse to one
+each; promo codes grant a free add-on server-side (cart totals unchanged).
 
 ## Test accounts (production)
 
