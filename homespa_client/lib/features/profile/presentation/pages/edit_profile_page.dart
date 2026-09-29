@@ -3,6 +3,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -26,7 +30,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   bool _isSaving = false;
-  final Uint8List? _pickedBytes = null;
+  Uint8List? _pickedBytes;
+  String _pickedContentType = 'image/jpeg';
 
   /// 'male' / 'female' (as saved at sign-up); null until loaded or unset.
   String? _gender;
@@ -50,10 +55,25 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     super.dispose();
   }
 
-  void _photoComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile photo upload is coming soon')),
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 512,
     );
+    if (image == null) return;
+    final bytes = await image.readAsBytes();
+    if (mounted) {
+      setState(() {
+        _pickedBytes = bytes;
+        _pickedContentType = image.name.toLowerCase().endsWith('.png')
+            ? 'image/png'
+            : image.name.toLowerCase().endsWith('.webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -66,6 +86,29 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     }
 
     setState(() => _isSaving = true);
+
+    // Upload the new photo first, so a failure surfaces before the pop.
+    final picked = _pickedBytes;
+    if (picked != null) {
+      final customerId = AuthSession.current?.customerId;
+      if (customerId != null) {
+        try {
+          await apiClient.postBytes(
+            '/customers/$customerId/avatar',
+            bytes: picked,
+            contentType: _pickedContentType,
+          );
+        } on ApiException catch (e) {
+          if (!mounted) return;
+          setState(() => _isSaving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo upload failed: ${e.message}')),
+          );
+          return;
+        }
+      }
+    }
+
     final result = await ref
         .read(authRepositoryProvider)
         .updateProfile(name: name, email: _emailCtrl.text.trim(), gender: _gender);
@@ -121,12 +164,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   url: user?.avatarUrl,
                   bytes: _pickedBytes,
                   initials: kaizenInitials(user?.name, user?.email ?? ''),
-                  onTap: _photoComingSoon,
+                  onTap: _pickImage,
                 ),
               ),
               Center(
                 child: TextButton(
-                  onPressed: _photoComingSoon,
+                  onPressed: _pickImage,
                   child: const Text('Change Photo'),
                 ),
               ),

@@ -36,6 +36,49 @@ class ApiClient {
 
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
+  /// Uploads raw bytes (e.g. an avatar image) with the given content type.
+  Future<dynamic> postBytes(
+    String path, {
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final request = http.Request('POST', Uri.parse('$baseUrl$path'));
+    request.headers['Content-Type'] = contentType;
+    final session = AuthSession.current;
+    if (session != null) {
+      request.headers['Authorization'] = 'Bearer ${session.token}';
+    }
+    request.bodyBytes = bytes;
+
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(const Duration(seconds: 60)),
+      );
+    } catch (_) {
+      throw const ApiException(
+        'Tidak dapat terhubung. Periksa koneksi internet Anda.',
+        0,
+      );
+    }
+
+    dynamic decoded;
+    if (response.body.isNotEmpty) {
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        decoded = null;
+      }
+    }
+    if (response.statusCode >= 400) {
+      final message = decoded is Map && decoded['error'] is String
+          ? decoded['error'] as String
+          : 'Upload failed (${response.statusCode})';
+      throw ApiException(message, response.statusCode);
+    }
+    return decoded;
+  }
+
   Future<dynamic> _send(
     String method,
     String path, {
