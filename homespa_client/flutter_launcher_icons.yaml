@@ -1,0 +1,9 @@
+# Launcher icons — Kaizen lotus (white) on dark olive #434930.
+# Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#434930"
+  adaptive_icon_foreground: "assets/icon/icon-fg.png"
