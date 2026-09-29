@@ -30,7 +30,7 @@ should collect **name + phone + password** (email optional, stored on profile).
 
 | App call today | Replacement |
 |---|---|
-| `auth.signUp` (email) | `POST /auth/register` `{name, phone, password, referralCode?}` → `{token, userId, customerId, name, phone}`. Claims legacy accounts by phone. |
+| `auth.signUp` (email) | `POST /auth/register` `{name, phone, email, password, referralCode?}` (email REQUIRED since 1.0.2) → `{token, userId, customerId, name, phone}`. Claims legacy accounts by phone. |
 | `auth.signInWithPassword` | `POST /auth/login` `{phone, password}` → same shape. |
 | `auth.currentUser` (29 sites) | Read cached profile + token from secure storage; refresh via `GET /customers/{customerId}/profile` *(live)*. |
 | `auth.updateUser` | `PATCH /customers/{customerId}/profile` `{name?, email?, gender?}` *(live)*. |
