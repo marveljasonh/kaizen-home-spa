@@ -18,12 +18,9 @@ class TherapistSelectionPage extends ConsumerWidget {
     final cart = ref.watch(bookingCartProvider);
     final selectedTherapist = cart.therapist;
 
-    // UTC start time, set once the user has been through the Schedule step.
-    final scheduledAt = cart.scheduledAt;
-
-    final bookedIds = ref
-        .watch(bookedTherapistIdsProvider(scheduledAt))
-        .maybeWhen(data: (ids) => ids, orElse: () => const <String>{});
+    // Real availability is checked on the Schedule step (and again by the
+    // database on booking commit), so nobody is greyed out here.
+    const bookedIds = <String>{};
 
     return FlowScaffold(
       title: 'Choose Therapist',

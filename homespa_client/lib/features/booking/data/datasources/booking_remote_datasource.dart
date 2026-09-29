@@ -1,364 +1,380 @@
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
+import '../../domain/entities/availability_slot.dart';
+import '../../domain/entities/booking_detail_data.dart';
 import '../../domain/entities/booking_record.dart';
 import '../../domain/entities/booking_request.dart';
+import '../../domain/entities/order_summary.dart';
 import '../../domain/entities/therapist.dart';
 import '../../domain/entities/voucher.dart';
-import '../models/booking_record_model.dart';
-import '../models/therapist_model.dart';
-import '../models/voucher_model.dart';
 
 abstract interface class BookingRemoteDataSource {
+  /// Therapists who have treated this customer (from completed bookings).
   Future<List<Therapist>> getTherapists();
   Future<Voucher> validateVoucher(String code);
   Future<String> createBooking(BookingRequest request);
   Future<List<BookingRecord>> getBookingHistory();
+  Future<List<OrderSummary>> getOrderSummaries();
+  Future<List<AvailabilitySlot>> getAvailability({
+    required String packageId,
+    required String date, // YYYY-MM-DD (WIB calendar day)
+    double? lat,
+    double? lng,
+  });
+  Future<BookingDetailData> getBookingDetail(String bookingId);
+  Future<void> submitReview(
+    String bookingId, {
+    required int score,
+    String? comment,
+  });
 }
 
 class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
-  final SupabaseClient _client;
-  const BookingRemoteDataSourceImpl(this._client);
+  final ApiClient _api;
+  BookingRemoteDataSourceImpl(this._api);
+
+  List<Map<String, dynamic>>? _branches;
+
+  String _customerId() {
+    final session = AuthSession.current;
+    if (session == null) throw const ApiException('Not signed in', 401);
+    return session.customerId;
+  }
+
+  // ── Branch resolution ──────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> _getBranches() async {
+    final cached = _branches;
+    if (cached != null) return cached;
+    final json = await _api.get('/branches') as Map<String, dynamic>;
+    _branches = (json['branches'] as List).cast<Map<String, dynamic>>();
+    return _branches!;
+  }
+
+  /// Nearest active branch to the coordinates, else the first one.
+  Future<String> _resolveBranchId({double? lat, double? lng}) async {
+    final branches = await _getBranches();
+    if (branches.isEmpty) {
+      throw const ApiException('No active branch', 500);
+    }
+    if (lat == null || lng == null) return branches.first['id'] as String;
+    Map<String, dynamic>? best;
+    double bestD = double.infinity;
+    for (final b in branches) {
+      final bLat = (b['lat'] as num?)?.toDouble();
+      final bLng = (b['lng'] as num?)?.toDouble();
+      if (bLat == null || bLng == null) continue;
+      final d = (bLat - lat) * (bLat - lat) + (bLng - lng) * (bLng - lng);
+      if (d < bestD) {
+        bestD = d;
+        best = b;
+      }
+    }
+    return (best ?? branches.first)['id'] as String;
+  }
+
+  // ── Bookings ───────────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> _fetchBookings() async {
+    final json =
+        await _api.get('/customers/${_customerId()}/bookings')
+            as Map<String, dynamic>;
+    return (json['bookings'] as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Platform statuses → the labels the app's order UI understands.
+  static String mapStatus(String platform) => switch (platform) {
+    'assigned' => 'therapist_assigned',
+    'en_route' => 'on_the_way',
+    'at_customer' => 'arrived',
+    _ => platform,
+  };
+
+  static BookingStatus recordStatus(String platform) => switch (platform) {
+    'pending' => BookingStatus.pending,
+    'assigned' => BookingStatus.confirmed,
+    'en_route' || 'at_customer' || 'in_progress' => BookingStatus.inProgress,
+    'completed' => BookingStatus.completed,
+    'cancelled' => BookingStatus.cancelled,
+    _ => BookingStatus.pending,
+  };
 
   @override
   Future<List<Therapist>> getTherapists() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return [];
-
-    try {
-      // Step 1: preferred_therapists — therapist_id = profiles.id (auth UID)
-      final preferred = await _client
-          .from('preferred_therapists')
-          .select('therapist_id, booking_count, last_booked_at')
-          .eq('client_id', userId)
-          .order('booking_count', ascending: false);
-
-      if (preferred.isEmpty) return [];
-
-      final ids = preferred.map((r) => r['therapist_id'] as String).toList();
-
-      // Step 2: name + avatar from profiles (keyed by id)
-      final profileRows = await _client
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .inFilter('id', ids);
-      final profileMap = {for (final r in profileRows) r['id'] as String: r};
-
-      // Step 3: rating + bio + specialties from therapist_profiles (keyed by profile_id)
-      final tProfileRows = await _client
-          .from('therapist_profiles')
-          .select(
-            'profile_id, rating_avg, bio, specialties, status, is_available',
-          )
-          .inFilter('profile_id', ids);
-      final tProfileMap = {
-        for (final r in tProfileRows) r['profile_id'] as String: r,
-      };
-
-      // Step 4: assemble flat map per therapist and parse
-      return preferred.map((pt) {
-        final tid = pt['therapist_id'] as String;
-        final profile = profileMap[tid] ?? {};
-        final tProfile = tProfileMap[tid] ?? {};
-        return TherapistModel.fromJson({
-          'id': tid,
-          'full_name': profile['full_name'],
-          'avatar_url': profile['avatar_url'],
-          'rating_avg': tProfile['rating_avg'],
-          'bio': tProfile['bio'],
-          'specialties': tProfile['specialties'],
-          'booking_count': pt['booking_count'],
-          'review_count': 0,
-          'status': tProfile['status'],
-          'is_available': tProfile['is_available'],
-        });
-      }).toList();
-    } catch (e) {
-      debugPrint('[getTherapists] ERROR: $e');
-      return [];
+    final rows = await _fetchBookings();
+    final seen = <String>{};
+    final result = <Therapist>[];
+    for (final r in rows) {
+      if (r['status'] != 'completed') continue;
+      final id = r['therapistId'] as String?;
+      final name = r['therapistName'] as String?;
+      if (id == null || name == null || !seen.add(id)) continue;
+      result.add(Therapist(id: id, name: name, rating: 0, reviewCount: 0));
     }
+    return result;
   }
 
   @override
   Future<Voucher> validateVoucher(String code) async {
-    final now = DateTime.now().toUtc().toIso8601String();
-    final data = await _client
-        .from('vouchers')
-        .select()
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .or('valid_until.is.null,valid_until.gte.$now')
-        .single();
-    return VoucherModel.fromJson(data);
+    final json =
+        await _api.post(
+              '/promos/validate',
+              body: {'code': code.trim().toUpperCase(), 'customerId': _customerId()},
+            )
+            as Map<String, dynamic>;
+    if (json['valid'] != true) {
+      throw ApiException(
+        (json['reason'] as String?) ?? 'Invalid or expired voucher',
+        400,
+      );
+    }
+    final grants = (json['grants'] as Map<String, dynamic>?) ?? const {};
+    return Voucher(
+      code: code.trim().toUpperCase(),
+      discountType: DiscountType.fixed,
+      discountValue: 0,
+      freeAddonName: grants['name'] as String?,
+      freeAddonDurationMinutes: (grants['durationMin'] as num?)?.toInt(),
+      freeAddonValueIdr: (grants['valueIdr'] as num?)?.toDouble(),
+    );
   }
 
   @override
   Future<String> createBooking(BookingRequest request) async {
-    final userId = _client.auth.currentUser!.id;
+    final customerId = _customerId();
 
-    // Snapshot reward fields immediately — request is immutable, but be explicit.
-    final freeRewardId = request.freeRewardId;
-    final freeRewardTreatmentId = request.freeRewardTreatmentId;
-    final discountRedemptionId = request.rewardRedemptionId;
+    final distinctTreatments = request.items
+        .map((i) => i.treatmentDurationId)
+        .whereType<String>()
+        .toSet();
+    if (distinctTreatments.length > 1) {
+      throw const ApiException(
+        'One booking covers one treatment — please book the second treatment separately.',
+        400,
+      );
+    }
 
-    debugPrint('[FreeReward] freeRewardId: $freeRewardId');
-    debugPrint('[FreeReward] freeRewardTreatmentId: $freeRewardTreatmentId');
-    debugPrint(
-      '[FreeReward] request.paymentMethodId: ${request.paymentMethodId}',
+    // The platform books one package; the package id IS the app's
+    // treatment-duration id. A rewards-only booking carries the reward's
+    // package in freeRewardTreatmentId.
+    final packageId =
+        request.treatmentDurationId ?? request.freeRewardTreatmentId;
+    if (packageId == null) {
+      throw const ApiException('Pick a treatment duration first', 400);
+    }
+
+    var addressId = request.addressId;
+    if (addressId == null) {
+      final created =
+          await _api.post(
+                '/customers/$customerId/addresses',
+                body: {
+                  'label': 'Booking address',
+                  'line': request.addressText,
+                  'city': (request.addressText.split(',').lastOrNull ?? '-')
+                      .trim(),
+                  'lat': request.latitude,
+                  'lng': request.longitude,
+                  if (request.addressNotes?.isNotEmpty ?? false)
+                    'entranceNotes': request.addressNotes,
+                },
+              )
+              as Map<String, dynamic>;
+      addressId =
+          (created['address'] as Map<String, dynamic>)['id'] as String;
+    }
+
+    final branchId = await _resolveBranchId(
+      lat: request.latitude,
+      lng: request.longitude,
     );
-    debugPrint('[FreeReward] request.total: ${request.total}');
-    debugPrint('[FreeReward] request.items.length: ${request.items.length}');
 
-    // Resolve voucher UUID from code if provided
-    String? voucherId;
-    if (request.voucherCode != null) {
-      try {
-        final row = await _client
-            .from('vouchers')
-            .select('id')
-            .eq('code', request.voucherCode!.toUpperCase())
-            .maybeSingle();
-        voucherId = row?['id'] as String?;
-      } catch (_) {
-        // proceed without voucher_id if lookup fails
-      }
-    }
+    final addonIds = request.addons.map((a) => a.addonId).toSet().toList();
+    final redemptionId = request.freeRewardId ?? request.rewardRedemptionId;
 
-    final branch = await _client
-        .from('branches')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-
-    final isFreeReward =
-        request.total == 0 && request.paymentMethodId == 'reward';
-
-    final bookingData = {
-      'client_id': userId,
-      'branch_id': branch['id'] as String,
-      'therapist_id': request.therapistId,
-      'scheduled_at': request.scheduledAt.toIso8601String(),
-      'address_snapshot': request.addressText,
-      'payment_method': isFreeReward ? 'reward' : request.paymentMethodId,
-      'payment_status': isFreeReward ? 'paid' : 'pending',
-      'status': 'pending',
-      'subtotal': request.subtotal,
-      'discount_amount': request.discountAmount,
-      'tax_amount': 0,
-      'total_amount': request.total,
-      'notes': request.addressNotes,
-      'voucher_id': voucherId,
-    };
-
-    debugPrint('payment_status being sent: ${bookingData['payment_status']}');
-    debugPrint('payment_method being sent: ${bookingData['payment_method']}');
-    debugPrint('full booking data: $bookingData');
-
-    final booking = await _client
-        .from('bookings')
-        .insert(bookingData)
-        .select('id')
-        .single();
-
-    debugPrint('[CreateBooking] booking created: ${booking['id']}');
-    debugPrint('[CreateBooking] cart items count: ${request.items.length}');
-
-    if (request.items.isNotEmpty) {
-      debugPrint('[CreateBooking] first item: ${request.items.first}');
-
-      final itemsToInsert = request.items
-          .map(
-            (item) => {
-              'booking_id': booking['id'],
-              'treatment_duration_id': item.treatmentDurationId,
-              'treatment_snapshot': {
-                'treatment_name': item.treatmentName,
-                'duration_minutes': item.durationMinutes,
-                'price': item.unitPrice,
+    final json =
+        await _api.post(
+              '/bookings',
+              body: {
+                'customerId': customerId,
+                'addressId': addressId,
+                'packageId': packageId,
+                'branchId': branchId,
+                'startISO': request.scheduledAt.toUtc().toIso8601String(),
+                if (request.therapistId != null)
+                  'therapistId': request.therapistId,
+                'paymentMethod': 'cash',
+                if (request.addressNotes?.isNotEmpty ?? false)
+                  'notes': request.addressNotes,
+                if (request.voucherCode != null)
+                  'promoCode': request.voucherCode,
+                if (redemptionId != null) 'redemptionId': redemptionId,
+                if (addonIds.isNotEmpty) 'addonIds': addonIds,
               },
-              'quantity': item.quantity,
-              'unit_price': item.unitPrice,
-              'subtotal': item.unitPrice * item.quantity,
-            },
-          )
-          .toList();
-
-      debugPrint('[CreateBooking] items to insert: $itemsToInsert');
-
-      try {
-        await _client.from('booking_items').insert(itemsToInsert);
-        debugPrint('[CreateBooking] items insert done');
-      } catch (e) {
-        debugPrint('[CreateBooking] booking_items insert ERROR: $e');
-      }
-    } else {
-      debugPrint(
-        '[CreateBooking] WARNING: no items in request, skipping booking_items insert',
-      );
-    }
-
-    // Insert booking_addons
-    debugPrint('[CreateBooking] cart addons count: ${request.addons.length}');
-
-    if (request.addons.isNotEmpty) {
-      final addonsToInsert = request.addons
-          .map(
-            (addon) => {
-              'booking_id': booking['id'],
-              'addon_id': addon.addonId,
-              'addon_snapshot': {
-                'addon_name': addon.addonName,
-                'price': addon.unitPrice,
-              },
-              'quantity': addon.quantity,
-              'unit_price': addon.unitPrice,
-              'subtotal': addon.unitPrice * addon.quantity,
-            },
-          )
-          .toList();
-
-      debugPrint('[CreateBooking] addons to insert: $addonsToInsert');
-
-      try {
-        await _client.from('booking_addons').insert(addonsToInsert);
-        debugPrint('[CreateBooking] addons insert done');
-      } catch (e) {
-        debugPrint('[CreateBooking] booking_addons insert ERROR: $e');
-      }
-    }
-
-    // Handle free reward: insert free treatment as a booking_item and mark redemption used
-    debugPrint(
-      '[FreeReward] reached free reward block — freeRewardId: $freeRewardId',
-    );
-    if (freeRewardId != null) {
-      debugPrint(
-        '[FreeReward] freeRewardId is NOT null — proceeding with insert',
-      );
-
-      // Look up the real treatment name from Supabase
-      String treatmentName = 'Free Treatment';
-      if (freeRewardTreatmentId != null) {
-        try {
-          final treatment = await _client
-              .from('treatments')
-              .select('name')
-              .eq('id', freeRewardTreatmentId)
-              .single();
-          treatmentName = (treatment['name'] as String?) ?? treatmentName;
-          debugPrint('[FreeReward] treatment name resolved: $treatmentName');
-        } catch (e) {
-          debugPrint('[FreeReward] treatment name lookup ERROR: $e');
-        }
-      } else {
-        debugPrint(
-          '[FreeReward] freeRewardTreatmentId is null — using fallback name',
-        );
-      }
-
-      // Insert free treatment as a booking_item with price 0
-      final freeDurationMinutes = request.freeRewardDurationMinutes ?? 0;
-      debugPrint(
-        '[FreeReward] inserting booking_item for: $treatmentName ($freeDurationMinutes min)',
-      );
-      try {
-        final insertResult = await _client.from('booking_items').insert({
-          'booking_id': booking['id'],
-          'treatment_duration_id': null,
-          'treatment_snapshot': {
-            'treatment_name': treatmentName,
-            'duration_minutes': freeDurationMinutes,
-            'price': 0,
-          },
-          'quantity': 1,
-          'unit_price': 0,
-          'subtotal': 0,
-        }).select();
-        debugPrint('[FreeReward] insert result: $insertResult');
-      } catch (e) {
-        debugPrint('[FreeReward] booking_item insert ERROR: $e');
-      }
-
-      // Mark reward redemption as used
-      try {
-        await _client
-            .from('reward_redemptions')
-            .update({
-              'is_used': true,
-              'used_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', freeRewardId);
-        debugPrint('[FreeReward] reward_redemption $freeRewardId marked used');
-      } catch (e) {
-        debugPrint('[FreeReward] reward_redemption update ERROR: $e');
-      }
-    } else {
-      debugPrint(
-        '[FreeReward] freeRewardId IS null — skipping free item insert',
-      );
-    }
-
-    // Mark discount reward redemption as used after booking is confirmed.
-    if (discountRedemptionId != null) {
-      try {
-        await _client
-            .from('reward_redemptions')
-            .update({
-              'is_used': true,
-              'used_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', discountRedemptionId);
-        debugPrint(
-          '[DiscountReward] redemption $discountRedemptionId marked used',
-        );
-      } catch (e) {
-        debugPrint('[DiscountReward] redemption update ERROR: $e');
-      }
-    }
-
-    return booking['id'] as String;
+            )
+            as Map<String, dynamic>;
+    return (json['booking'] as Map<String, dynamic>)['id'] as String;
   }
 
   @override
   Future<List<BookingRecord>> getBookingHistory() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return [];
-
-    // 1. Fetch all bookings for this user
-    final rows = await _client
-        .from('bookings')
-        .select()
-        .eq('client_id', userId)
-        .order('scheduled_at', ascending: false);
-
-    if (rows.isEmpty) return [];
-
-    // 2. Resolve therapist names (flat query, only if any booking has one)
-    final therapistIds = rows
-        .where((r) => r['therapist_id'] != null)
-        .map((r) => r['therapist_id'] as String)
-        .toSet()
-        .toList();
-    final Map<String, String> therapistMap = {};
-    if (therapistIds.isNotEmpty) {
-      final therapistRows = await _client
-          .from('therapist_profiles')
-          .select('id, name')
-          .inFilter('id', therapistIds);
-      for (final t in therapistRows) {
-        therapistMap[t['id'] as String] = t['name'] as String;
-      }
-    }
-
-    // 3. Assemble (bookings table has no treatment_id; use generic name)
+    final rows = await _fetchBookings();
     return rows.map((r) {
-      final tid = r['therapist_id'] as String?;
-      return BookingRecordModel.fromJson(
-        r,
-        treatmentName: 'Kaizen Spa Service',
-        therapistName: tid != null ? therapistMap[tid] : null,
+      final scheduled = DateTime.parse(r['scheduledStart'] as String).toUtc();
+      return BookingRecord(
+        id: r['id'] as String,
+        treatmentId: (r['packageId'] as String?) ?? '',
+        treatmentName: (r['packageName'] as String?) ?? 'Kaizen Spa Service',
+        therapistName: r['therapistName'] as String?,
+        scheduledAt: scheduled,
+        addressText: [
+          r['addressLabel'],
+          r['addressLine'],
+        ].whereType<String>().join(' — '),
+        paymentMethod: 'cash',
+        subtotal: (r['totalAmountIdr'] as num?)?.toDouble() ?? 0,
+        discount: 0,
+        total: (r['totalAmountIdr'] as num?)?.toDouble() ?? 0,
+        status: recordStatus((r['status'] as String?) ?? 'pending'),
+        createdAt:
+            DateTime.tryParse('${r['createdAt']}')?.toUtc() ?? scheduled,
       );
     }).toList();
+  }
+
+  @override
+  Future<List<OrderSummary>> getOrderSummaries() async {
+    final rows = await _fetchBookings();
+    final summaries = rows.map((r) {
+      final scheduled = DateTime.parse(r['scheduledStart'] as String).toUtc();
+      final created =
+          DateTime.tryParse('${r['createdAt']}')?.toUtc() ?? scheduled;
+      return OrderSummary(
+        id: r['id'] as String,
+        scheduledAt: scheduled,
+        createdAt: created,
+        status: mapStatus((r['status'] as String?) ?? 'pending'),
+        items: [
+          OrderSummaryItem(
+            treatmentDurationId: r['packageId'] as String?,
+            treatmentId: null,
+            treatmentName:
+                (r['packageName'] as String?) ?? 'Kaizen Spa Service',
+            durationMinutes: (r['packageDurationMin'] as num?)?.toInt(),
+            quantity: 1,
+          ),
+        ],
+        address: [
+          r['addressLabel'],
+          r['addressLine'],
+        ].whereType<String>().join(' — '),
+        total: (r['totalAmountIdr'] as num?)?.toDouble() ?? 0,
+      );
+    }).toList();
+    summaries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return summaries;
+  }
+
+  @override
+  Future<List<AvailabilitySlot>> getAvailability({
+    required String packageId,
+    required String date,
+    double? lat,
+    double? lng,
+  }) async {
+    final branchId = await _resolveBranchId(lat: lat, lng: lng);
+    final json =
+        await _api.get(
+              '/availability',
+              query: {
+                'packageId': packageId,
+                'branchId': branchId,
+                'date': date,
+              },
+            )
+            as Map<String, dynamic>;
+    return (json['slots'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (s) => AvailabilitySlot(
+            startUtc: DateTime.parse(s['startISO'] as String).toUtc(),
+            therapistId: s['therapistId'] as String,
+            therapistName: s['therapistName'] as String,
+            label: (s['label'] as String?) ?? '',
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<BookingDetailData> getBookingDetail(String bookingId) async {
+    final json =
+        await _api.get('/bookings/$bookingId') as Map<String, dynamic>;
+    final b = json['booking'] as Map<String, dynamic>;
+
+    final addonRows =
+        (b['addons'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final review = b['review'] as Map<String, dynamic>?;
+    final total = (b['totalAmountIdr'] as num?)?.toDouble() ?? 0;
+    final discount = (b['discountIdr'] as num?)?.toDouble() ?? 0;
+    final packagePrice = (b['packagePriceIdr'] as num?)?.toDouble() ?? 0;
+
+    return BookingDetailData(
+      bookingId: b['id'] as String,
+      status: recordStatus((b['status'] as String?) ?? 'pending'),
+      statusRaw: mapStatus((b['status'] as String?) ?? 'pending'),
+      scheduledAt: DateTime.parse(b['scheduledStart'] as String).toUtc(),
+      addressText: [
+        b['addressLabel'],
+        b['addressLine'],
+      ].whereType<String>().join(' — '),
+      paymentMethod: (b['paymentMethod'] as String?) ?? 'cash',
+      subtotal: packagePrice +
+          addonRows.fold<double>(
+            0,
+            (s, a) => s + ((a['priceIdr'] as num?)?.toDouble() ?? 0),
+          ),
+      discountAmount: discount,
+      taxAmount: 0,
+      totalAmount: total,
+      therapistId: b['therapistId'] as String?,
+      therapistName: b['therapistName'] as String?,
+      therapistRating: (b['therapistRating'] as num?)?.toDouble(),
+      therapistAvatarUrl: b['therapistAvatarUrl'] as String?,
+      therapistPhone: b['therapistPhone'] as String?,
+      treatments: [
+        TreatmentLineItem(
+          name: (b['packageName'] as String?) ?? 'Kaizen Spa Service',
+          price: packagePrice,
+          durationMinutes: (b['packageDurationMin'] as num?)?.toInt() ?? 0,
+        ),
+      ],
+      addons: [
+        for (final a in addonRows)
+          AddonLineItem(
+            name: (a['name'] as String?) ?? 'Add-on',
+            price: (a['priceIdr'] as num?)?.toDouble() ?? 0,
+          ),
+      ],
+      hasExistingReview: review != null,
+      existingRating: (review?['score'] as num?)?.toDouble(),
+      existingReviewText: review?['comment'] as String?,
+    );
+  }
+
+  @override
+  Future<void> submitReview(
+    String bookingId, {
+    required int score,
+    String? comment,
+  }) async {
+    await _api.post(
+      '/bookings/$bookingId/review',
+      body: {
+        'score': score,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+    );
   }
 }

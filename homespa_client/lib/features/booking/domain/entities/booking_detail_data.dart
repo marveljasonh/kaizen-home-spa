@@ -29,6 +29,9 @@ class AddonLineItem {
 class BookingDetailData {
   final String bookingId;
   final BookingStatus status;
+
+  /// Granular platform status ('on_the_way', 'arrived', …) for the timeline.
+  final String statusRaw;
   final DateTime scheduledAt;
   final String addressText;
   final String paymentMethod;
@@ -50,6 +53,7 @@ class BookingDetailData {
   const BookingDetailData({
     required this.bookingId,
     required this.status,
+    this.statusRaw = 'pending',
     required this.scheduledAt,
     required this.addressText,
     required this.paymentMethod,
@@ -71,6 +75,7 @@ class BookingDetailData {
 
   BookingDetailData copyWith({
     BookingStatus? status,
+    String? statusRaw,
     DateTime? scheduledAt,
     String? addressText,
     String? paymentMethod,
@@ -91,6 +96,7 @@ class BookingDetailData {
   }) => BookingDetailData(
     bookingId: bookingId,
     status: status ?? this.status,
+    statusRaw: statusRaw ?? this.statusRaw,
     scheduledAt: scheduledAt ?? this.scheduledAt,
     addressText: addressText ?? this.addressText,
     paymentMethod: paymentMethod ?? this.paymentMethod,

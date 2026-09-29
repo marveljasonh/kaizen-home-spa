@@ -21,10 +21,8 @@ class BookingDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(bookingDetailProvider(bookingId));
-    // Realtime status comes from the stream; falls back to notifier state
-    final streamAsync = ref.watch(bookingDetailStreamProvider(bookingId));
-    final rawStatus =
-        streamAsync.value?['status'] as String? ??
+    // Live status comes from the notifier's 15 s poll of GET /bookings/{id}.
+    final rawStatus = state.detail?.statusRaw ??
         _bookingStatusToString(state.detail?.status) ??
         'pending';
 

@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../treatments/presentation/widgets/glass_icon_button.dart';
 import '../../domain/entities/order_filters.dart';
 import '../../domain/entities/order_summary.dart';
-import '../providers/booking_providers.dart';
 import '../providers/order_history_providers.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter_sheet.dart';
@@ -113,8 +111,6 @@ class _BookingsPageState extends ConsumerState<BookingsPage> {
   }
 
   Future<void> _refresh() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId != null) ref.invalidate(bookingHistoryStreamProvider(userId));
     ref.invalidate(orderHistoryProvider);
     try {
       await ref.read(orderHistoryProvider.future);
@@ -128,7 +124,7 @@ class _BookingsPageState extends ConsumerState<BookingsPage> {
     // Signed-out users are redirected to login by the router; the provider
     // also returns an empty list without a user.
     final ordersAsync = ref.watch(orderHistoryProvider);
-    // Treatment ids for the selected categories (Supabase `treatments` query).
+    // Treatment ids for the selected categories (resolved from the catalog).
     final categoryTreatmentIds = _filters.categoryIds.isEmpty
         ? null
         : ref.watch(

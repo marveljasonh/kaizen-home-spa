@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../profile/data/address_repository.dart';
+import '../../../profile/domain/entities/saved_address.dart';
 import '../../domain/entities/service_address.dart';
 import '../providers/booking_cart.dart';
 import '../widgets/booking_step_indicator.dart';
@@ -31,6 +32,10 @@ class _LocationPageState extends ConsumerState<LocationPage> {
   // Jakarta city centre as default
   LatLng _center = const LatLng(-6.2088, 106.8456);
   String _detectedAddress = '';
+
+  /// Set when the user picks a saved address; cleared once the map pin or the
+  /// text no longer matches it, so the platform books against the right row.
+  SavedAddress? _pickedSaved;
   bool _isGeocoding = false;
   bool _isLocating = false;
 
@@ -142,13 +147,24 @@ class _LocationPageState extends ConsumerState<LocationPage> {
       if (_unitController.text.trim().isNotEmpty) _unitController.text.trim(),
     ].join(', ');
 
+    // Reuse the saved platform address only while the text still matches it
+    // (moving the pin or editing the text books a fresh address instead).
+    final saved = _pickedSaved;
+    final usesSaved = saved != null &&
+        address == saved.fullAddress &&
+        _buildingController.text.trim().isEmpty &&
+        _unitController.text.trim().isEmpty;
+
     ref
         .read(bookingCartProvider.notifier)
         .setAddress(
           ServiceAddress(
+            id: usesSaved ? saved.id : null,
             fullAddress: parts,
-            latitude: _center.latitude,
-            longitude: _center.longitude,
+            latitude:
+                usesSaved && saved.lat != null ? saved.lat! : _center.latitude,
+            longitude:
+                usesSaved && saved.lng != null ? saved.lng! : _center.longitude,
             notes: _notesController.text.trim().isNotEmpty
                 ? _notesController.text.trim()
                 : null,
@@ -299,10 +315,23 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                                         onTap: () {
                                           setState(() {
                                             _detectedAddress = addr.fullAddress;
+                                            _pickedSaved = addr;
                                             if (addr.notes != null &&
                                                 addr.notes!.isNotEmpty) {
                                               _notesController.text =
                                                   addr.notes!;
+                                            }
+                                            if (addr.lat != null &&
+                                                addr.lng != null) {
+                                              final target = LatLng(
+                                                addr.lat!,
+                                                addr.lng!,
+                                              );
+                                              _center = target;
+                                              _mapController.move(
+                                                target,
+                                                16.0,
+                                              );
                                             }
                                           });
                                           _addressController.text =

@@ -41,6 +41,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       treatmentDurationId: cart.selectedDuration?.id,
       therapistId: cart.therapist?.id,
       scheduledAt: scheduledAt,
+      addressId: cart.address!.id,
       addressText: cart.address!.fullAddress,
       latitude: cart.address!.latitude,
       longitude: cart.address!.longitude,

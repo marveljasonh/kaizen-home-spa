@@ -1,29 +1,35 @@
 class SavedAddress {
   final String id;
-  final String clientId;
   final String label;
-  final String fullAddress;
-  final String? notes;
+  final String fullAddress; // platform `line`
+  final String? city;
+  final String? patokan; // landmark
+  final String? notes; // platform `entranceNotes`
   final bool isDefault;
-  final DateTime createdAt;
+  final double? lat;
+  final double? lng;
 
   const SavedAddress({
     required this.id,
-    required this.clientId,
     required this.label,
     required this.fullAddress,
+    this.city,
+    this.patokan,
     this.notes,
     required this.isDefault,
-    required this.createdAt,
+    this.lat,
+    this.lng,
   });
 
   factory SavedAddress.fromJson(Map<String, dynamic> json) => SavedAddress(
     id: json['id'] as String,
-    clientId: json['client_id'] as String,
-    label: json['label'] as String,
-    fullAddress: json['full_address'] as String,
-    notes: json['notes'] as String?,
-    isDefault: json['is_default'] as bool? ?? false,
-    createdAt: DateTime.parse(json['created_at'] as String),
+    label: (json['label'] as String?) ?? 'Address',
+    fullAddress: (json['line'] as String?) ?? '',
+    city: json['city'] as String?,
+    patokan: json['patokan'] as String?,
+    notes: json['entranceNotes'] as String?,
+    isDefault: json['isDefault'] as bool? ?? false,
+    lat: (json['lat'] as num?)?.toDouble(),
+    lng: (json['lng'] as num?)?.toDouble(),
   );
 }

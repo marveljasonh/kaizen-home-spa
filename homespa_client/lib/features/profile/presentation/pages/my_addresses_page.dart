@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../../core/widgets/kaizen_page.dart';
@@ -77,11 +76,9 @@ class MyAddressesPage extends ConsumerWidget {
                     _AddressCard(
                       address: addr,
                       onSetDefault: () async {
-                        final userId =
-                            Supabase.instance.client.auth.currentUser?.id ?? '';
                         await ref
                             .read(addressRepositoryProvider)
-                            .setDefault(addr.id, userId);
+                            .setDefault(addr.id);
                         ref.invalidate(savedAddressesProvider);
                       },
                       onEdit: () => _openEditor(context, ref, addr),
