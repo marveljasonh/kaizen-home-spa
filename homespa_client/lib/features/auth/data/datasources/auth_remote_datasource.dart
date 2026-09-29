@@ -8,6 +8,7 @@ abstract interface class AuthRemoteDataSource {
   Future<AuthSession> register({
     required String name,
     required String phone,
+    required String email,
     required String password,
     String? referralCode,
   });
@@ -44,6 +45,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<AuthSession> register({
     required String name,
     required String phone,
+    required String email,
     required String password,
     String? referralCode,
   }) async {
@@ -53,6 +55,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               body: {
                 'name': name,
                 'phone': phone,
+                'email': email,
                 'password': password,
                 if (referralCode != null && referralCode.isNotEmpty)
                   'referralCode': referralCode,

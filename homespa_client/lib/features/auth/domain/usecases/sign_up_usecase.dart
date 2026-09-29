@@ -11,11 +11,13 @@ class SignUpUseCase {
   Future<Either<Failure, AppUser>> call({
     required String name,
     required String phone,
+    required String email,
     required String password,
     String? referralCode,
   }) => _repository.signUp(
     name: name,
     phone: phone,
+    email: email,
     password: password,
     referralCode: referralCode,
   );

@@ -64,13 +64,13 @@ class AuthNotifier extends Notifier<AppAuthState> {
     });
   }
 
-  /// Registers (or claims a legacy account), then saves email + gender to the
+  /// Registers (or claims a legacy account), then saves gender to the
   /// profile before surfacing the authenticated state.
   Future<void> signUpAndSaveProfile({
     required String name,
     required String phone,
+    required String email,
     required String password,
-    String? email,
     String? gender,
     String? referralCode,
   }) async {
@@ -80,6 +80,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
         .call(
           name: name,
           phone: phone,
+          email: email,
           password: password,
           referralCode: referralCode,
         );
@@ -89,10 +90,8 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
     final user = result.getOrElse(() => throw StateError('unreachable'));
     // Best-effort: profile extras must not block a successful registration.
-    if ((email != null && email.isNotEmpty) || gender != null) {
-      await ref
-          .read(authRepositoryProvider)
-          .updateProfile(email: email, gender: gender);
+    if (gender != null) {
+      await ref.read(authRepositoryProvider).updateProfile(gender: gender);
     }
     // Set before the state change the router reacts to.
     ref.read(justSignedUpProvider.notifier).state = true;

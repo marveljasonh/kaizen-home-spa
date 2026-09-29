@@ -14,6 +14,7 @@ abstract interface class AuthRepository {
   Future<Either<Failure, AppUser>> signUp({
     required String name,
     required String phone,
+    required String email,
     required String password,
     String? referralCode,
   });

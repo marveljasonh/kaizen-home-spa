@@ -34,6 +34,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, AppUser>> signUp({
     required String name,
     required String phone,
+    required String email,
     required String password,
     String? referralCode,
   }) async {
@@ -41,6 +42,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final session = await _dataSource.register(
         name: name,
         phone: phone,
+        email: email,
         password: password,
         referralCode: referralCode,
       );

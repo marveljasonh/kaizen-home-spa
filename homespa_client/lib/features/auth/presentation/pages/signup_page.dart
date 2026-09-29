@@ -103,13 +103,18 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     const SizedBox(height: 16),
                     AuthTextField(
                       controller: _emailController,
-                      label: 'Email (optional)',
+                      label: 'Email',
                       hint: 'you@example.com',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null;
-                        if (!v.contains('@')) return 'Enter a valid email';
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Email is required';
+                        }
+                        final email = v.trim();
+                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                          return 'Enter a valid email';
+                        }
                         return null;
                       },
                     ),
