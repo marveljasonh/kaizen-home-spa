@@ -10,10 +10,14 @@ import '../api/auth_session.dart';
 class NotificationService {
   static final _messaging = FirebaseMessaging.instance;
 
+  // Set via --dart-define=SCREENSHOT_MODE=true for store-screenshot drives:
+  // skips the permission request so no native dialog covers the UI.
+  static const _screenshotMode = bool.fromEnvironment('SCREENSHOT_MODE');
+
   static Future<void> init() async {
     // No-op until Firebase is configured for this platform (iOS needs
     // GoogleService-Info.plist) — push is best-effort, never a crash.
-    if (kIsWeb || Firebase.apps.isEmpty) return;
+    if (kIsWeb || Firebase.apps.isEmpty || _screenshotMode) return;
 
     // Request permission (Android 13+ / iOS)
     final settings = await _messaging.requestPermission(
