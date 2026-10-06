@@ -38,12 +38,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_gender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your gender')),
-      );
-      return;
-    }
     await ref
         .read(authNotifierProvider.notifier)
         .signUpAndSaveProfile(
@@ -51,7 +45,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
           phone: _phoneController.text.trim(),
           password: _passwordController.text,
           email: _emailController.text.trim(),
-          gender: _gender!,
+          gender: _gender,
         );
   }
 
@@ -187,7 +181,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
                     // ── Gender selection ──────────────────────────────────────
                     Text(
-                      'Gender',
+                      'Gender (optional)',
                       style: AppTypography.labelMedium.copyWith(
                         color: AppColors.textSecondary,
                       ),

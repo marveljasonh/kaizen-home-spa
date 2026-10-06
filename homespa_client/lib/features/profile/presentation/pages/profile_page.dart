@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -166,7 +168,9 @@ class ProfilePage extends ConsumerWidget {
                 icon: Icons.star_outline_rounded,
                 title: 'Rate the App',
                 onTap: () => _launchUrl(
-                  'https://play.google.com/store/apps/details?id=com.homespa.client',
+                  Platform.isIOS
+                      ? 'https://apps.apple.com/app/id6817308705?action=write-review'
+                      : 'https://play.google.com/store/apps/details?id=com.kaizenspa.app',
                 ),
               ),
             ],

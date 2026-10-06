@@ -44,7 +44,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(notifier.dispose);
 
   return GoRouter(
-    initialLocation: '/auth/login',
+    initialLocation: '/',
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authNotifierProvider);
@@ -52,7 +52,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final isAuthRoute = location.startsWith('/auth');
 
-      if (!isAuthenticated) return isAuthRoute ? null : '/auth/login';
+      if (!isAuthenticated) {
+        // Guests may browse freely (App Review 5.1.1(v)); account-based
+        // surfaces (booking flow, bookings, profile, intake) require login.
+        const guestPrefixes = ['/treatments', '/search', '/promo'];
+        final isGuestOk = location == '/' ||
+            guestPrefixes.any(
+              (p) => location == p || location.startsWith('$p/'),
+            );
+        return (isAuthRoute || isGuestOk) ? null : '/auth/login';
+      }
 
       // A brand-new account sees the welcome screen first; its Get Started
       // clears the flag and opens the intake form. Checked before the intake
