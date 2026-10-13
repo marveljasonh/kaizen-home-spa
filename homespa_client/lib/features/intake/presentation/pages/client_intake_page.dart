@@ -1,24 +1,29 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/intake_providers.dart';
 
 // Client Intake Form: full-screen stepper, one question per screen, on the
-// reference's light cream page. New clients land here after sign-up / login
-// (/intake, can't be left by going back); Profile → Health & Preferences
-// opens it prefilled (/intake/edit).
+// app page colour (dark olive by default, cream in light mode). New clients
+// land here after sign-up / login (/intake, can't be left by going back);
+// Profile → Health & Preferences opens it prefilled (/intake/edit).
 
-const Color _kPage = Color(0xFFEDEDE3);
-const Color _kInk = Color(0xFF313129);
-const Color _kMuted = Color(0xFF7A7A70);
-const Color _kPillBorder = Color(0xFFD6D6CA);
-const Color _kSelectedFill = Color(0xFFA9B38A);
-const Color _kSelectedInk = Color(0xFF434930); // dark olive
-const Color _kButton = Color(0xFF5B6142);
+Color get _kPage => AppColors.page;
+Color get _kInk => AppColors.fg;
+Color get _kMuted => AppColors.fgMuted;
+Color get _kPillBorder =>
+    AppColors.isDark ? AppColors.tint(0.3) : const Color(0xFFD6D6CA);
+Color get _kUnselectedFill => AppColors.card;
+Color get _kSelectedFill => AppColors.cardSelected;
+Color get _kSelectedBorder => kFlowSelectedBorder;
+Color get _kSelectedInk =>
+    AppColors.isDark ? AppColors.fg : AppColors.darkOliveLight;
 const double _kGutter = 30;
 const double _kRadius = 10;
 const double _kButtonHeight = 54;
@@ -50,7 +55,7 @@ const List<String> _kFocusAreas = [
   'Arms & Hands',
   'Inner & Outer Thighs',
 ];
-const List<(String, String)> _kPressures = [
+List<(String, String)> get _kPressures => [
   ('light', 'Light Pressure'),
   ('medium', 'Medium Pressure'),
   ('firm', 'Firm Pressure'),
@@ -59,12 +64,12 @@ const List<(String, String)> _kPressures = [
 TextStyle _body(
   double size, {
   FontWeight weight = FontWeight.w400,
-  Color color = _kInk,
+  Color? color,
   double? height,
 }) => GoogleFonts.montserrat(
   fontSize: size,
   fontWeight: weight,
-  color: color,
+  color: color ?? _kInk,
   height: height,
 );
 
@@ -246,7 +251,9 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
+      value: AppColors.isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
       child: PopScope(
         // Back goes to the previous question; the first-time form can't be
         // left, the edit form pops from question 1.
@@ -418,9 +425,9 @@ class _Header extends StatelessWidget {
                   width: 48,
                   child: showBack
                       ? IconButton(
-                          tooltip: 'Back',
+                          tooltip: tr('Back'),
                           onPressed: onBack,
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back_rounded,
                             color: _kInk,
                           ),
@@ -453,8 +460,8 @@ class _Header extends StatelessWidget {
                 builder: (_, value, _) => LinearProgressIndicator(
                   value: value,
                   minHeight: 4,
-                  color: _kButton,
-                  backgroundColor: _kButton.withValues(alpha: 0.15),
+                  color: AppColors.btnFill,
+                  backgroundColor: AppColors.tint(0.15),
                 ),
               ),
             ),
@@ -485,7 +492,7 @@ class _Question extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'CalSans',
             fontWeight: FontWeight.w600,
             fontSize: 26,
@@ -521,10 +528,10 @@ class _Chip extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? _kSelectedFill : Colors.white,
+        color: selected ? _kSelectedFill : _kUnselectedFill,
         shape: StadiumBorder(
           side: BorderSide(
-            color: selected ? _kSelectedInk : _kPillBorder,
+            color: selected ? _kSelectedBorder : _kPillBorder,
             width: selected ? 1 : 0.8,
           ),
         ),
@@ -578,10 +585,10 @@ class _OptionPill extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? _kSelectedFill : Colors.white,
+        color: selected ? _kSelectedFill : _kUnselectedFill,
         shape: StadiumBorder(
           side: BorderSide(
-            color: selected ? _kSelectedInk : _kPillBorder,
+            color: selected ? _kSelectedBorder : _kPillBorder,
             width: selected ? 1 : 0.8,
           ),
         ),
@@ -606,7 +613,7 @@ class _OptionPill extends StatelessWidget {
                     ),
                   ),
                   if (selected)
-                    const Icon(
+                    Icon(
                       Icons.check_rounded,
                       size: 20,
                       color: _kSelectedInk,
@@ -631,7 +638,7 @@ class _AvoidField extends StatelessWidget {
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(_kRadius),
-      borderSide: const BorderSide(color: _kPillBorder, width: 0.8),
+      borderSide: BorderSide(color: _kPillBorder, width: 0.8),
     );
     return TextField(
       controller: controller,
@@ -643,10 +650,10 @@ class _AvoidField extends StatelessWidget {
       cursorColor: _kSelectedInk,
       style: _body(15),
       decoration: InputDecoration(
-        hintText: 'e.g. Neck, left shoulder',
+        hintText: tr('e.g. Neck, left shoulder'),
         hintStyle: _body(15, color: _kMuted),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: _kUnselectedFill,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 16,
@@ -654,14 +661,14 @@ class _AvoidField extends StatelessWidget {
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: _kSelectedInk),
+          borderSide: BorderSide(color: _kSelectedInk),
         ),
       ),
     );
   }
 }
 
-/// Olive #5B6142, white Montserrat, radius 10, 54 tall.
+/// Primary button (white / olive in light mode), Montserrat, radius 10, 54 tall.
 class _ContinueButton extends StatelessWidget {
   final String label;
   final bool isLoading;
@@ -681,7 +688,9 @@ class _ContinueButton extends StatelessWidget {
       button: true,
       enabled: enabled,
       child: Material(
-        color: _kButton.withValues(alpha: enabled || isLoading ? 1 : 0.4),
+        color: AppColors.btnFill.withValues(
+          alpha: enabled || isLoading ? 1 : 0.4,
+        ),
         borderRadius: radius,
         child: InkWell(
           borderRadius: radius,
@@ -690,11 +699,11 @@ class _ContinueButton extends StatelessWidget {
             height: _kButtonHeight,
             child: Center(
               child: isLoading
-                  ? const SizedBox.square(
+                  ? SizedBox.square(
                       dimension: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppColors.btnText,
                       ),
                     )
                   : Text(
@@ -702,7 +711,7 @@ class _ContinueButton extends StatelessWidget {
                       style: _body(
                         17,
                         weight: FontWeight.w500,
-                        color: Colors.white,
+                        color: AppColors.btnText,
                       ),
                     ),
             ),
@@ -718,8 +727,8 @@ class IntakeCheckPage extends StatelessWidget {
   const IntakeCheckPage({super.key});
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    backgroundColor: Color(0xFF434930),
-    body: Center(child: CircularProgressIndicator(color: Colors.white)),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.page,
+    body: Center(child: CircularProgressIndicator(color: AppColors.fg)),
   );
 }

@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 
 class PaymentMethod extends Equatable {
   final String id;

@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/treatments/presentation/widgets/glass_icon_button.dart';
+import '../i18n/material_i18n.dart';
 import '../theme/app_colors.dart';
 import 'flow_widgets.dart';
 
@@ -48,8 +48,8 @@ const double kButtonRadius = 10;
 const double kSmallButtonHeight = 44;
 
 /// Status colours used on Promos (Active / Expired).
-const Color kStatusActive = Color(0xFF74D38E);
-const Color kStatusDanger = Color(0xFFFF7B6E);
+Color get kStatusActive => AppColors.success;
+Color get kStatusDanger => AppColors.danger;
 
 const _kHeroCorners = BorderRadius.only(
   bottomLeft: Radius.circular(kHeroRadius),
@@ -282,8 +282,8 @@ class KaizenHeroPage extends StatelessWidget {
     );
     if (onRefresh != null) {
       list = RefreshIndicator(
-        color: AppColors.cream,
-        backgroundColor: AppColors.darkOlive,
+        color: AppColors.fg,
+        backgroundColor: AppColors.page,
         onRefresh: onRefresh!,
         child: list,
       );
@@ -294,7 +294,7 @@ class KaizenHeroPage extends StatelessWidget {
       child: Theme(
         data: flowTheme(context),
         child: Scaffold(
-          backgroundColor: AppColors.darkOlive, // #434930
+          backgroundColor: AppColors.page, // dark #434930
           body: list,
           bottomNavigationBar: bottomBar == null
               ? null
@@ -357,11 +357,14 @@ class KaizenGlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(kGlassCardRadius);
+    final dark = AppColors.isDark;
     return Material(
-      color: Colors.white.withValues(alpha: 0.10),
+      color: dark ? Colors.white.withValues(alpha: 0.10) : AppColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        side: BorderSide(
+          color: dark ? Colors.white.withValues(alpha: 0.15) : AppColors.border,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -375,20 +378,23 @@ class KaizenGlassCard extends StatelessWidget {
 /// Gold-tinted square behind an icon (Promos reward tile).
 class KaizenIconTile extends StatelessWidget {
   final IconData icon;
-  final Color color;
-  const KaizenIconTile(this.icon, {super.key, this.color = AppColors.gold});
+  final Color? color;
+  const KaizenIconTile(this.icon, {super.key, this.color});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 44,
-    height: 44,
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(kButtonRadius),
-      border: Border.all(color: color.withValues(alpha: 0.35), width: 0.5),
-    ),
-    child: Icon(icon, size: 22, color: color),
-  );
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.gold;
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(kButtonRadius),
+        border: Border.all(color: c.withValues(alpha: 0.35), width: 0.5),
+      ),
+      child: Icon(icon, size: 22, color: c),
+    );
+  }
 }
 
 /// Small olive action (Promos "Use"): #4E523B, white Montserrat 15, radius
@@ -467,11 +473,16 @@ class KaizenPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: tint == null
-            ? Colors.white.withValues(alpha: 0.2)
+            ? (AppColors.isDark
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : AppColors.primaryLight)
             : tint.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(kTagRadius),
         border: tint == null
-            ? Border.all(color: Colors.white, width: 0.3)
+            ? Border.all(
+                color: AppColors.isDark ? Colors.white : AppColors.tint(0.25),
+                width: 0.3,
+              )
             : Border.all(color: tint.withValues(alpha: 0.4)),
       ),
       child: Text(
@@ -481,7 +492,7 @@ class KaizenPill extends StatelessWidget {
         style: flowBody(
           12,
           weight: FontWeight.w500,
-          color: tint ?? Colors.white,
+          color: tint ?? AppColors.fg,
         ).copyWith(letterSpacing: 0.8),
       ),
     );
@@ -515,14 +526,13 @@ class KaizenChoiceTabs<T> extends StatelessWidget {
               selected: options[i].$1 == selected,
               child: Material(
                 color: options[i].$1 == selected
-                    ? Colors.white
-                    : AppColors.darkOliveLight,
+                    ? AppColors.btnFill
+                    : (AppColors.isDark
+                          ? AppColors.darkOliveLight
+                          : AppColors.card),
                 shape: RoundedRectangleBorder(
                   borderRadius: radius,
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    width: 0.5,
-                  ),
+                  side: BorderSide(color: AppColors.tint(0.3), width: 0.5),
                 ),
                 child: InkWell(
                   borderRadius: radius,
@@ -537,8 +547,8 @@ class KaizenChoiceTabs<T> extends StatelessWidget {
                         style: flowBody(
                           15,
                           color: options[i].$1 == selected
-                              ? AppColors.darkOliveLight
-                              : Colors.white,
+                              ? AppColors.btnText
+                              : AppColors.fg,
                         ),
                       ),
                     ),
@@ -566,10 +576,10 @@ Future<bool> showKaizenConfirmDialog(
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => Dialog(
-      backgroundColor: AppColors.secondary, // #313129
+      backgroundColor: AppColors.header, // dark #313129
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        side: BorderSide(color: AppColors.tint(0.15)),
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: kPageGutterLeft),
       child: Padding(
@@ -622,8 +632,10 @@ class _DialogConfirmButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(kButtonRadius);
+    final dark = AppColors.isDark;
+    const red = Color(0xFFC0392B);
     return Material(
-      color: Colors.white,
+      color: destructive && !dark ? red : AppColors.btnFill,
       borderRadius: radius,
       child: InkWell(
         borderRadius: radius,
@@ -637,8 +649,8 @@ class _DialogConfirmButton extends StatelessWidget {
                 15,
                 weight: FontWeight.w600,
                 color: destructive
-                    ? const Color(0xFFC0392B)
-                    : AppColors.darkOliveLight,
+                    ? (dark ? red : Colors.white)
+                    : AppColors.btnText,
               ),
             ),
           ),
@@ -684,8 +696,7 @@ class KaizenAvatar extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         // Plain olive while loading; initials only if it fails.
-        placeholder: (_, _) =>
-            const ColoredBox(color: AppColors.darkOliveLight),
+        placeholder: (_, _) => ColoredBox(color: AppColors.darkOliveLight),
         errorWidget: (_, _, _) => _initials(),
       );
     } else {
@@ -708,7 +719,7 @@ class KaizenAvatar extends StatelessWidget {
     height: size,
     color: AppColors.darkOliveLight, // #4E523B
     alignment: Alignment.center,
-    child: Text(initials, style: flowHeading(size * 0.36)),
+    child: Text(initials, style: flowHeading(size * 0.36, color: Colors.white)),
   );
 }
 

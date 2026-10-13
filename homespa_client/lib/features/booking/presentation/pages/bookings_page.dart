@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -138,10 +138,10 @@ class _BookingsPageState extends ConsumerState<BookingsPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.darkOliveLight, // #4E523B
+        backgroundColor: AppColors.tabPage, // dark #4E523B / light cream
         body: RefreshIndicator(
-          color: AppColors.cream,
-          backgroundColor: AppColors.darkOlive,
+          color: AppColors.fg,
+          backgroundColor: AppColors.page,
           onRefresh: _refresh,
           // Layered hero: the photo/gradient layer sits *behind* the scroll
           // view and moves with it, so the order cards slide over its lower
@@ -419,7 +419,8 @@ class _HeroContent extends StatelessWidget {
   }
 }
 
-/// Active: white with dark olive text. Inactive: olive with white text.
+/// Active: button fill (white / olive) with its text colour. Inactive: olive
+/// (dark) / white (light) card with page text. Sits on the hero photo.
 class _TabPill extends StatelessWidget {
   final String label;
   final bool active;
@@ -437,7 +438,9 @@ class _TabPill extends StatelessWidget {
       selected: active,
       button: true,
       child: Material(
-        color: active ? Colors.white : AppColors.darkOliveLight,
+        color: active
+            ? AppColors.btnFill
+            : (AppColors.isDark ? AppColors.darkOliveLight : AppColors.card),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: InkWell(
           customBorder: RoundedRectangleBorder(
@@ -453,7 +456,7 @@ class _TabPill extends StatelessWidget {
                 style: GoogleFonts.montserrat(
                   fontSize: 18,
                   fontWeight: FontWeight.w400,
-                  color: active ? AppColors.darkOliveLight : Colors.white,
+                  color: active ? AppColors.btnText : AppColors.fg,
                 ),
               ),
             ),
@@ -483,42 +486,36 @@ class _SearchField extends StatelessWidget {
         controller: controller,
         autofocus: true,
         onChanged: onChanged,
-        cursorColor: Colors.white,
-        style: GoogleFonts.montserrat(fontSize: 14, color: Colors.white),
+        cursorColor: AppColors.fg,
+        style: GoogleFonts.montserrat(fontSize: 14, color: AppColors.fg),
         decoration: InputDecoration(
-          hintText: 'Search by treatment or order code',
+          hintText: tr('Search by treatment or order code'),
           hintStyle: GoogleFonts.montserrat(
             fontSize: 14,
-            color: AppColors.textOnDarkMuted,
+            color: AppColors.fgMuted,
           ),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.10),
+          fillColor: AppColors.isDark ? AppColors.glassFill : AppColors.card,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 12,
           ),
           suffixIcon: IconButton(
-            tooltip: 'Close search',
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
+            tooltip: tr('Close search'),
+            icon: Icon(Icons.close_rounded, color: AppColors.fg),
             onPressed: onClose,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: Colors.white.withValues(alpha: 0.5),
-              width: 0.5,
-            ),
+            borderSide: BorderSide(color: AppColors.tint(0.5), width: 0.5),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: Colors.white.withValues(alpha: 0.5),
-              width: 0.5,
-            ),
+            borderSide: BorderSide(color: AppColors.tint(0.5), width: 0.5),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.white),
+            borderSide: BorderSide(color: AppColors.fg),
           ),
         ),
       ),
@@ -552,7 +549,7 @@ class _SkeletonSliver extends StatelessWidget {
           aspectRatio: OrderCard.designWidth / OrderCard.designHeight,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.darkOlive,
+              color: AppColors.isDark ? AppColors.darkOlive : AppColors.card,
               borderRadius: BorderRadius.circular(4.603 * 341 / 222),
             ),
           ),
@@ -579,7 +576,7 @@ class _MessageSliver extends StatelessWidget {
               textAlign: TextAlign.center,
               style: GoogleFonts.montserrat(
                 fontSize: 13,
-                color: AppColors.textOnDarkMuted,
+                color: AppColors.fgMuted,
               ),
             ),
             if (onRetry != null)
@@ -590,7 +587,7 @@ class _MessageSliver extends StatelessWidget {
                   style: GoogleFonts.montserrat(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.cream,
+                    color: AppColors.fg,
                   ),
                 ),
               ),

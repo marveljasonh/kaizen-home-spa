@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/i18n/app_lang.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../promo/presentation/providers/rewards_provider.dart';
@@ -112,9 +114,9 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                 selected: true,
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.card_giftcard_rounded,
-                      color: kFlowGold,
+                      color: AppColors.goldDark,
                       size: 22,
                     ),
                     const SizedBox(width: 12),
@@ -129,7 +131,7 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                       style: flowBody(
                         12,
                         weight: FontWeight.w600,
-                        color: kFlowGold,
+                        color: AppColors.goldDark,
                       ),
                     ),
                   ],
@@ -269,8 +271,8 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                     textCapitalization: TextCapitalization.characters,
                     style: flowBody(15, weight: FontWeight.w500),
                     decoration: InputDecoration(
-                      hintText: 'e.g. KAIZEN20',
-                      errorText: _errorMessage,
+                      hintText: tr('e.g. KAIZEN20'),
+                      errorText: _errorMessage == null ? null : tr(_errorMessage!),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 17,
@@ -303,7 +305,7 @@ class _VoucherPageState extends ConsumerState<VoucherPage> {
                     Text('You save', style: flowBody(14, color: kFlowMuted)),
                     Text(
                       '-${formatRupiah(cart.discountAmount)}',
-                      style: flowHeading(20, color: kFlowGold),
+                      style: flowHeading(20, color: AppColors.goldDark),
                     ),
                   ],
                 ),
@@ -343,16 +345,16 @@ class _InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = highlight ? kFlowGold : kFlowMuted;
+    final color = highlight ? AppColors.goldDark : kFlowMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: AppColors.tint(0.08),
         borderRadius: BorderRadius.circular(kFlowRadius),
         border: Border.all(
           color: highlight
-              ? kFlowGold.withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.18),
+              ? AppColors.goldDark.withValues(alpha: 0.5)
+              : AppColors.tint(0.18),
           width: 0.5,
         ),
       ),
@@ -385,7 +387,7 @@ class _CardAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLocked) {
-      return const Icon(
+      return Icon(
         Icons.lock_outline_rounded,
         color: kFlowMuted,
         size: 18,
@@ -444,7 +446,7 @@ class _AvailableVoucherCard extends StatelessWidget {
                     style: flowBody(
                       13,
                       weight: FontWeight.w600,
-                      color: isLocked ? kFlowMuted : kFlowGold,
+                      color: isLocked ? kFlowMuted : AppColors.goldDark,
                     ),
                   ),
                   if (expiresAt != null) ...[
@@ -517,12 +519,12 @@ class _SelectableRewardCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.10),
+                color: AppColors.glassFill,
                 borderRadius: BorderRadius.circular(kFlowRadius),
               ),
               child: Icon(
                 Icons.card_giftcard_rounded,
-                color: isApplied ? kFlowGold : kFlowMuted,
+                color: isApplied ? AppColors.goldDark : kFlowMuted,
                 size: 20,
               ),
             ),
@@ -542,7 +544,7 @@ class _SelectableRewardCard extends StatelessWidget {
                     style: flowBody(
                       13,
                       weight: FontWeight.w600,
-                      color: isLocked ? kFlowMuted : kFlowGold,
+                      color: isLocked ? kFlowMuted : AppColors.goldDark,
                     ),
                   ),
                 ],
@@ -577,7 +579,7 @@ class _AppliedVoucherCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
         children: [
-          const Icon(Icons.local_offer_rounded, color: kFlowGold, size: 22),
+          Icon(Icons.local_offer_rounded, color: AppColors.goldDark, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -593,7 +595,7 @@ class _AppliedVoucherCard extends StatelessWidget {
                   style: flowBody(
                     12,
                     weight: FontWeight.w500,
-                    color: kFlowGold,
+                    color: AppColors.goldDark,
                   ),
                 ),
               ],
@@ -603,7 +605,7 @@ class _AppliedVoucherCard extends StatelessWidget {
             onPressed: onRemove,
             child: Text(
               'Remove',
-              style: flowBody(13, color: const Color(0xFFFFB4A8)),
+              style: flowBody(13, color: AppColors.danger),
             ),
           ),
         ],

@@ -127,6 +127,8 @@ export interface Branch {
   id: string;
   name: string;
   address: string | null;
+  phone: string | null; // WhatsApp number shown in the client app's Contact Us page
+  operating_hours: string | null;
   lat: number | null;
   lng: number | null;
   radius_km: number | null;

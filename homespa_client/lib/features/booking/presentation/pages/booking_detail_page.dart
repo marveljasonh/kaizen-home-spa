@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -70,7 +70,7 @@ class BookingDetailPage extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.btnText,
                   ),
                 ),
               ),
@@ -202,7 +202,7 @@ class _DetailBody extends StatelessWidget {
                                 child: Text(
                                   'FREE',
                                   style: text.labelSmall?.copyWith(
-                                    color: Colors.white,
+                                    color: AppColors.btnText,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.3,
                                   ),
@@ -293,7 +293,7 @@ class _DetailBody extends StatelessWidget {
               _PaymentRow(
                 label: 'Discount',
                 value: -detail.discountAmount,
-                valueColor: const Color(0xFF10B981),
+                valueColor: AppColors.success,
               ),
             if (detail.taxAmount > 0)
               _PaymentRow(label: 'Tax', value: detail.taxAmount),
@@ -441,7 +441,7 @@ class _ChatButton extends ConsumerWidget {
       onPressed: () => context.push('/chat/$bookingId'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.btnText,
         minimumSize: const Size(double.infinity, 46),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -458,7 +458,7 @@ class _ChatButton extends ConsumerWidget {
           if (unread > 0) ...[
             const SizedBox(width: 8),
             Semantics(
-              label: '$unread unread',
+              label: tr('$unread unread'),
               child: Container(
                 constraints: const BoxConstraints(minWidth: 20),
                 height: 20,
@@ -563,7 +563,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border.withValues(alpha: 0.4),
+                color: AppColors.tint(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -606,7 +606,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
             controller: _reviewController,
             maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'Write a review (optional)…',
+              hintText: tr('Write a review (optional)…'),
               filled: true,
               fillColor: AppColors.surfaceVariant.withValues(alpha: 0.4),
               border: OutlineInputBorder(
@@ -616,7 +616,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: AppColors.border.withValues(alpha: 0.3),
+                  color: AppColors.tint(0.25),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -648,7 +648,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
                       if (!mounted) return;
                       nav.pop();
                       messenger.showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text('Review submitted — thank you!'),
                           backgroundColor: AppColors.primary,
                         ),
@@ -658,7 +658,7 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
                       messenger.showSnackBar(
                         SnackBar(
                           content: Text('Could not submit review: $e'),
-                          backgroundColor: const Color(0xFFD32F2F),
+                          backgroundColor: AppColors.danger,
                         ),
                       );
                     }
@@ -670,12 +670,12 @@ class _RatingBottomSheetState extends ConsumerState<_RatingBottomSheet> {
               ),
             ),
             child: isSubmitting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: AppColors.btnText,
                     ),
                   )
                 : const Text(
@@ -703,11 +703,15 @@ class _StatusBadge extends StatelessWidget {
       'therapist_assigned' ||
       'rider_assigned' ||
       'on_the_way' ||
-      'arrived' => const Color(0xFF3B82F6),
-      'in_progress' => const Color(0xFF8B5CF6),
-      'completed' => const Color(0xFF10B981),
-      'cancelled' => const Color(0xFF6B7280),
-      _ => const Color(0xFF6B7280),
+      'arrived' => AppColors.isDark
+          ? const Color(0xFF93C5FD)
+          : const Color(0xFF3B82F6),
+      'in_progress' => AppColors.isDark
+          ? const Color(0xFFC4B5FD)
+          : const Color(0xFF8B5CF6),
+      'completed' => AppColors.success,
+      'cancelled' => AppColors.fgMuted,
+      _ => AppColors.fgMuted,
     };
     final label = switch (status) {
       'pending' => 'Pending',

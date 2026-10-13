@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -90,8 +90,8 @@ class _TreatmentsPageState extends ConsumerState<TreatmentsPage> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: Scaffold(
-          // Figma: Services uses a photo backdrop; Massage uses #4E523B.
-          backgroundColor: AppColors.darkOliveLight,
+          // Figma: Services uses a photo backdrop; Massage uses the page colour.
+          backgroundColor: AppColors.tabPage,
           body: showCategories
               ? const _CategorySelectionView()
               : CategoryTreatmentsView(
@@ -131,8 +131,8 @@ class _CategorySelectionView extends ConsumerWidget {
           ),
         ),
         RefreshIndicator(
-          color: AppColors.cream,
-          backgroundColor: AppColors.darkOliveLight,
+          color: AppColors.fg,
+          backgroundColor: AppColors.card,
           onRefresh: () async => ref.invalidate(categoriesProvider),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -321,7 +321,7 @@ class _CategoryError extends StatelessWidget {
             style: GoogleFonts.montserrat(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.cream,
+              color: const Color(0xFFFAF7F2), // on the photo backdrop
             ),
           ),
         ),

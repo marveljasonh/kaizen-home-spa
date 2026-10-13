@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/app_lang.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../../core/utils/currency_formatter.dart';
-import '../../../../../core/widgets/flow_widgets.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/flow_widgets.dart';
 import '../../../booking/presentation/providers/booking_cart.dart';
 import '../../domain/entities/addon.dart';
 import '../../domain/entities/treatment.dart';
@@ -14,11 +16,14 @@ import '../providers/treatments_providers.dart';
 // Cart page's summary panel (white 10% fill, hairline white border, no blur),
 // olive +/- steppers, and a total + Skip / Add to Cart bar.
 
-final Color _kCardFill = Colors.white.withValues(alpha: 0.10);
-final Color _kCardBorder = Colors.white.withValues(alpha: 0.15);
-const Color _kSelectedFill = kFlowCardColor; // #4E523B
-final Color _kSelectedBorder = Colors.white.withValues(alpha: 0.45);
-const Color _kOlive = kFlowAccent; // #5B6240
+Color get _kCardFill =>
+    AppColors.isDark ? AppColors.tint(0.10) : AppColors.card;
+Color get _kCardBorder => AppColors.tint(0.15);
+Color get _kSelectedFill =>
+    AppColors.isDark ? kFlowCardColor : AppColors.cardSelected; // #4E523B
+Color get _kSelectedBorder =>
+    AppColors.isDark ? AppColors.tint(0.45) : kFlowSelectedBorder;
+Color get _kOlive => kFlowAccent; // #5B6240
 const double _kCardRadius = 16;
 
 class AddonSelectionPage extends ConsumerStatefulWidget {
@@ -87,7 +92,7 @@ class _AddonSelectionPageState extends ConsumerState<AddonSelectionPage> {
         content: Text('${widget.treatment.name} added to cart'),
         duration: const Duration(seconds: 3),
         action: SnackBarAction(
-          label: 'View Cart',
+          label: tr('View Cart'),
           onPressed: () => router.push('/booking/cart'),
         ),
       ),
@@ -135,12 +140,12 @@ class _AddonSelectionPageState extends ConsumerState<AddonSelectionPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                const Icon(Icons.spa_rounded, size: 18, color: Colors.white70),
+                Icon(Icons.spa_rounded, size: 18, color: AppColors.fgMuted),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     widget.treatment.name,
-                    style: flowHeading(16, color: Colors.white),
+                    style: flowHeading(16),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -151,7 +156,7 @@ class _AddonSelectionPageState extends ConsumerState<AddonSelectionPage> {
                   style: flowBody(
                     14,
                     weight: FontWeight.w600,
-                    color: Colors.white70,
+                    color: AppColors.fgMuted,
                   ),
                 ),
               ],
@@ -170,7 +175,7 @@ class _AddonSelectionPageState extends ConsumerState<AddonSelectionPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.add_circle_outline_rounded,
                           size: 48,
                           color: kFlowMuted,
@@ -242,13 +247,13 @@ class _AddonCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: AppColors.tint(0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.add_circle_outline_rounded,
               size: 22,
-              color: Colors.white70,
+              color: AppColors.fgMuted,
             ),
           ),
           const SizedBox(width: 14),
@@ -258,7 +263,7 @@ class _AddonCard extends StatelessWidget {
               children: [
                 Text(
                   addon.name,
-                  style: flowHeading(17, color: Colors.white),
+                  style: flowHeading(17),
                 ),
                 if (addon.description.isNotEmpty) ...[
                   const SizedBox(height: 3),
@@ -266,7 +271,7 @@ class _AddonCard extends StatelessWidget {
                     addon.description,
                     style: flowBody(
                       12,
-                      color: Colors.white70,
+                      color: AppColors.fgMuted,
                       height: 1.35,
                     ),
                     maxLines: 2,
@@ -279,7 +284,7 @@ class _AddonCard extends StatelessWidget {
                   style: flowBody(
                     15,
                     weight: FontWeight.w600,
-                    color: Colors.white70,
+                    color: AppColors.fgMuted,
                   ),
                 ),
               ],
@@ -327,7 +332,7 @@ class _QuantityControl extends StatelessWidget {
             style: flowBody(
               15,
               weight: FontWeight.w600,
-              color: Colors.white,
+              color: AppColors.fg,
             ),
           ),
         ),
@@ -377,7 +382,7 @@ class _CircleButton extends StatelessWidget {
   Widget build(BuildContext context) => Material(
     color: _kOlive,
     shape: CircleBorder(
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+      side: BorderSide(color: AppColors.tint(0.3)),
     ),
     child: InkWell(
       customBorder: const CircleBorder(),

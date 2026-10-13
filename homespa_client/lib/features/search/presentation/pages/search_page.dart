@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,9 +56,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: AppColors.isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: AppColors.darkOliveLight,
+        backgroundColor: AppColors.tabPage,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -72,6 +74,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                       iconSize: 33,
                       iconOffset: const Offset(6.5, 8.5),
                       fillAlpha: 0.20,
+                      adaptive: true,
                       onTap: () => context.pop(),
                     ),
                     const SizedBox(width: 12),
@@ -91,7 +94,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(24.5),
       borderSide: BorderSide(
-        color: Colors.white.withValues(alpha: 0.5),
+        color: AppColors.tint(0.5),
         width: 0.746,
       ),
     );
@@ -103,31 +106,31 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         textInputAction: TextInputAction.search,
         onChanged: _onChanged,
         onSubmitted: _search,
-        cursorColor: Colors.white,
-        style: GoogleFonts.montserrat(fontSize: 14, color: Colors.white),
+        cursorColor: AppColors.fg,
+        style: GoogleFonts.montserrat(fontSize: 14, color: AppColors.fg),
         decoration: InputDecoration(
-          hintText: 'Search treatments',
+          hintText: tr('Search treatments'),
           hintStyle: GoogleFonts.montserrat(
             fontSize: 14,
-            color: AppColors.textOnDarkMuted,
+            color: AppColors.fgMuted,
           ),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.10),
+          fillColor: AppColors.glassFill,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           suffixIcon: ListenableBuilder(
             listenable: _controller,
             builder: (_, __) => _controller.text.isEmpty
-                ? const Icon(Icons.search_rounded, color: Colors.white)
+                ? Icon(Icons.search_rounded, color: AppColors.fg)
                 : IconButton(
-                    tooltip: 'Clear',
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    tooltip: tr('Clear'),
+                    icon: Icon(Icons.close_rounded, color: AppColors.fg),
                     onPressed: _clear,
                   ),
           ),
           border: border,
           enabledBorder: border,
           focusedBorder: border.copyWith(
-            borderSide: const BorderSide(color: Colors.white),
+            borderSide: BorderSide(color: AppColors.fg),
           ),
         ),
       ),
@@ -140,8 +143,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     }
     final resultsAsync = ref.watch(treatmentSearchProvider(_query));
     return resultsAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.cream),
+      loading: () => Center(
+        child: CircularProgressIndicator(color: AppColors.fg),
       ),
       error: (_, __) => _Message(
         'We couldn’t search right now.',
@@ -187,7 +190,7 @@ class _Message extends StatelessWidget {
             textAlign: TextAlign.center,
             style: GoogleFonts.montserrat(
               fontSize: 14,
-              color: AppColors.textOnDarkMuted,
+              color: AppColors.fgMuted,
             ),
           ),
           if (onRetry != null)
@@ -198,7 +201,7 @@ class _Message extends StatelessWidget {
                 style: GoogleFonts.montserrat(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.cream,
+                  color: AppColors.fg,
                 ),
               ),
             ),

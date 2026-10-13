@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart'
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/i18n/app_lang.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/timezone_helper.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -26,45 +27,49 @@ import '../widgets/chat_photo.dart';
 // body; sent bubbles white on the right, received bubbles glass on the left.
 // Push notifications come from a DB trigger.
 
-/// Dark chat palette, kept in one place so it can move into the app theme
-/// tokens when the light/dark switch is added.
+/// Chat palette, mode-aware: every member is a getter over [AppColors].
 abstract final class _ChatColors {
   // Surfaces
-  static const Color page = Color(0xFF434930);
-  static const Color header = Color(0xFF313129);
-  static const Color bar = Color(0xFF313129); // input bar, read-only notice
-  static const Color sheet = Color(0xFF313129); // bottom sheets, dialogs
-  static const Color divider = Color(0x26FFFFFF); // white 15%
+  static Color get page => AppColors.page;
+  static Color get header => AppColors.header;
+  static Color get bar => AppColors.header; // input bar, read-only notice
+  static Color get sheet => AppColors.header; // bottom sheets, dialogs
+  static Color get divider => AppColors.tint(0.15);
 
   // Text on the page
-  static const Color ink = Colors.white;
-  static const Color muted = Color(0xB3FFFFFF); // white 70%
-  static const Color hint = Color(0x99FFFFFF); // white 60%
-  static const Color disabled = Color(0x59FFFFFF); // white 35%
-  static const Color accent = Colors.white; // spinners, cursor, links, icons
+  static Color get ink => AppColors.fg;
+  static Color get muted => AppColors.fgMuted;
+  static Color get hint => AppColors.fgFaint;
+  static Color get disabled => AppColors.tint(0.35);
+  static Color get accent => AppColors.fg; // spinners, cursor, links, icons
 
   // Date chip
-  static const Color chip = Color(0x1FFFFFFF); // white 12%
-  static const Color chipText = Color(0xB3FFFFFF); // white 70%
+  static Color get chip => AppColors.tint(0.12);
+  static Color get chipText => AppColors.fgMuted;
 
   // Input
-  static const Color field = Color(0x1AFFFFFF); // white 10%
-  static const Color fieldBorder = Color(0x33FFFFFF); // white 20%
-  static const Color fieldFocus = Colors.white;
-  static const Color sendButton = Color(0xFF4E523B);
+  static Color get field => AppColors.tint(0.1);
+  static Color get fieldBorder => AppColors.tint(0.2);
+  static Color get fieldFocus => AppColors.btnFill; // white / olive
+  static Color get sendButton => AppColors.darkOliveLight; // olive both modes
 
-  // Bubbles
-  static const Color sentBubble = Colors.white;
-  static const Color onSent = Color(0xFF2C2C2A);
-  static const Color onSentMeta = Color(0xFF6B6B68); // muted dark
-  static const Color receivedBubble = Color(0x1AFFFFFF); // white 10%
-  static const Color receivedBorder = Color(0x26FFFFFF); // white 15%
-  static const Color onReceived = Colors.white;
-  static const Color onReceivedMeta = Color(0x99FFFFFF); // white 60%
-  static const Color photoPlaceholderSent = Color(0xFFEDE6D8);
-  static const Color photoPlaceholderReceived = Color(0x14FFFFFF);
+  // Bubbles: sent = button colours (white/olive), received = glass / white card
+  static Color get sentBubble => AppColors.btnFill;
+  static Color get onSent => AppColors.btnText;
+  static Color get onSentMeta =>
+      AppColors.isDark ? const Color(0xFF6B6B68) : const Color(0xB3FFFFFF);
+  static Color get receivedBubble =>
+      AppColors.isDark ? const Color(0x1AFFFFFF) : AppColors.card;
+  static Color get receivedBorder =>
+      AppColors.isDark ? AppColors.tint(0.15) : AppColors.tint(0.1);
+  static Color get onReceived => AppColors.fg;
+  static Color get onReceivedMeta => AppColors.fgFaint;
+  static Color get photoPlaceholderSent =>
+      AppColors.isDark ? const Color(0xFFEDE6D8) : const Color(0x26FFFFFF);
+  static Color get photoPlaceholderReceived => AppColors.tint(0.08);
 
-  static const Color error = Color(0xFFFFB4A8);
+  static Color get error =>
+      AppColors.isDark ? const Color(0xFFFFB4A8) : AppColors.danger;
 }
 
 const String _kIconBack = 'assets/icons/chevron_left_33.svg';
@@ -423,7 +428,9 @@ class _ChatPageState extends ConsumerState<ChatPage>
         _showPermissionDenied(camera: e.code == 'camera_access_denied');
       } else {
         _snack(
-          'Couldn’t open ${source == ImageSource.camera ? 'the camera' : 'your photos'}.',
+          source == ImageSource.camera
+              ? 'Couldn’t open the camera.'
+              : 'Couldn’t open your photos.',
         );
       }
       return;
@@ -535,15 +542,20 @@ class _ChatPageState extends ConsumerState<ChatPage>
     final readOnly = status != null && _kClosedStatuses.contains(status);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      // Light status-bar and navigation-bar icons over the dark header and
-      // input bar.
-      value: SystemUiOverlayStyle.light.copyWith(
-        systemNavigationBarColor: _ChatColors.bar,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
+      // Status-bar and navigation-bar icons follow the header / input bar.
+      value:
+          (AppColors.isDark
+                  ? SystemUiOverlayStyle.light
+                  : SystemUiOverlayStyle.dark)
+              .copyWith(
+                systemNavigationBarColor: _ChatColors.bar,
+                systemNavigationBarIconBrightness: AppColors.isDark
+                    ? Brightness.light
+                    : Brightness.dark,
+              ),
       child: Theme(
         data: Theme.of(context).copyWith(
-          textSelectionTheme: const TextSelectionThemeData(
+          textSelectionTheme: TextSelectionThemeData(
             cursorColor: _ChatColors.accent,
             selectionHandleColor: _ChatColors.accent,
           ),
@@ -553,7 +565,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
           body: Column(
             children: [
               _ChatHeader(
-                name: info?.therapistName ?? 'Therapist',
+                name: info?.therapistName ?? tr('Therapist'),
                 avatarUrl: info?.therapistAvatarUrl,
                 onBack: () => context.canPop()
                     ? context.pop()
@@ -578,7 +590,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
 
   Widget _buildMessages(String? therapistName) {
     if (_loading && _messages.isEmpty) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: _ChatColors.accent),
       );
     }
@@ -598,7 +610,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
       );
     }
     if (_messages.isEmpty) {
-      return _EmptyChat(name: therapistName ?? 'your therapist');
+      return _EmptyChat(name: therapistName ?? tr('your therapist'));
     }
 
     return GestureDetector(
@@ -610,7 +622,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
         itemCount: _messages.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, i) {
           if (i == _messages.length) {
-            return const Padding(
+            return Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Center(
                 child: SizedBox.square(
@@ -685,17 +697,17 @@ class _ChatHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: _ChatColors.header, // #313129
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: _ChatColors.header,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x33000000),
+            color: AppColors.shadow,
             blurRadius: 14,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -709,6 +721,7 @@ class _ChatHeader extends StatelessWidget {
                 svgAsset: _kIconBack,
                 iconSize: 33,
                 iconOffset: const Offset(6.5, 8.5),
+                adaptive: true,
                 onTap: onBack,
               ),
               const SizedBox(width: 14),
@@ -764,7 +777,7 @@ class _Avatar extends StatelessWidget {
                   .map((w) => w[0])
                   .join()
                   .toUpperCase(),
-        style: flowHeading(16),
+        style: flowHeading(16, color: Colors.white),
       ),
     );
     final link = url?.trim() ?? '';
@@ -774,7 +787,7 @@ class _Avatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: AppColors.tint(0.5),
           width: 0.5,
         ),
       ),
@@ -796,7 +809,7 @@ class _Avatar extends StatelessWidget {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 
-/// Sent: white with dark text, right. Received: glass with white text, left.
+/// Sent: button colours (white / olive), right. Received: glass, left.
 class _Bubble extends StatelessWidget {
   final ChatMessage message;
   final bool mine;
@@ -962,7 +975,7 @@ class _FailedAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    label: semantics,
+    label: tr(semantics),
     excludeSemantics: true,
     child: InkWell(
       onTap: onTap,
@@ -1034,7 +1047,7 @@ class _EmptyChat extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.forum_outlined,
               size: 48,
               color: _ChatColors.muted,
@@ -1081,11 +1094,11 @@ class _InputBar extends StatelessWidget {
 
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(kFlowRadius),
-      borderSide: const BorderSide(color: _ChatColors.fieldBorder),
+      borderSide: BorderSide(color: _ChatColors.fieldBorder),
     );
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _ChatColors.bar,
         border: Border(top: BorderSide(color: _ChatColors.divider)),
       ),
@@ -1117,7 +1130,7 @@ class _InputBar extends StatelessWidget {
                   SizedBox.square(
                     dimension: 48,
                     child: IconButton(
-                      tooltip: 'Send a photo',
+                      tooltip: tr('Send a photo'),
                       onPressed: enabled ? onAttach : null,
                       icon: const Icon(Icons.photo_camera_outlined),
                       color: _ChatColors.accent,
@@ -1138,7 +1151,7 @@ class _InputBar extends StatelessWidget {
                       ],
                       style: flowBody(14.5, color: _ChatColors.ink),
                       decoration: InputDecoration(
-                        hintText: 'Write a message…',
+                        hintText: tr('Write a message…'),
                         hintStyle: flowBody(14.5, color: _ChatColors.hint),
                         filled: true,
                         fillColor: _ChatColors.field,
@@ -1150,7 +1163,7 @@ class _InputBar extends StatelessWidget {
                         enabledBorder: fieldBorder,
                         disabledBorder: fieldBorder,
                         focusedBorder: fieldBorder.copyWith(
-                          borderSide: const BorderSide(
+                          borderSide: BorderSide(
                             color: _ChatColors.fieldFocus,
                           ),
                         ),
@@ -1160,7 +1173,7 @@ class _InputBar extends StatelessWidget {
                   const SizedBox(width: 10),
                   Semantics(
                     button: true,
-                    label: 'Send message',
+                    label: tr('Send message'),
                     enabled: canSend,
                     child: Material(
                       color: canSend
@@ -1198,10 +1211,10 @@ class _ClosedNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final what = status == 'cancelled' ? 'cancelled' : 'completed';
+    final what = tr(status == 'cancelled' ? 'cancelled' : 'completed');
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _ChatColors.bar,
         border: Border(top: BorderSide(color: _ChatColors.divider)),
       ),
@@ -1211,7 +1224,7 @@ class _ClosedNotice extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(_kGutter, 14, _kGutter, 14),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lock_outline_rounded,
                 size: 18,
                 color: _ChatColors.muted,
@@ -1294,7 +1307,7 @@ class _PhotoPreviewSheetState extends State<_PhotoPreviewSheet> {
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(kFlowRadius),
-      borderSide: const BorderSide(color: _ChatColors.fieldBorder),
+      borderSide: BorderSide(color: _ChatColors.fieldBorder),
     );
     final radius = BorderRadius.circular(kFlowRadius);
 
@@ -1336,7 +1349,7 @@ class _PhotoPreviewSheetState extends State<_PhotoPreviewSheet> {
                 ],
                 style: flowBody(14.5, color: _ChatColors.ink),
                 decoration: InputDecoration(
-                  hintText: 'Add a caption (optional)',
+                  hintText: tr('Add a caption (optional)'),
                   hintStyle: flowBody(14.5, color: _ChatColors.hint),
                   filled: true,
                   fillColor: _ChatColors.field,
@@ -1347,7 +1360,7 @@ class _PhotoPreviewSheetState extends State<_PhotoPreviewSheet> {
                   border: border,
                   enabledBorder: border,
                   focusedBorder: border.copyWith(
-                    borderSide: const BorderSide(color: _ChatColors.fieldFocus),
+                    borderSide: BorderSide(color: _ChatColors.fieldFocus),
                   ),
                 ),
               ),
@@ -1360,7 +1373,7 @@ class _PhotoPreviewSheetState extends State<_PhotoPreviewSheet> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                         foregroundColor: _ChatColors.ink,
-                        side: const BorderSide(color: _ChatColors.fieldBorder),
+                        side: BorderSide(color: _ChatColors.fieldBorder),
                         shape: RoundedRectangleBorder(borderRadius: radius),
                       ),
                       child: const Text('Cancel'),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -79,9 +79,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Email is required';
+                          return tr('Email is required');
                         }
-                        if (!v.contains('@')) return 'Enter a valid email';
+                        if (!v.contains('@')) return tr('Enter a valid email');
                         return null;
                       },
                     ),
@@ -105,7 +105,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Password is required';
+                          return tr('Password is required');
                         }
                         return null;
                       },
@@ -113,7 +113,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () => context.push('/auth/forgot-password'),
                         child: Text(
                           'Forgot password?',
                           style: AppTypography.labelMedium.copyWith(
@@ -170,11 +170,11 @@ class _BrandHeader extends StatelessWidget {
         Container(
           width: 80,
           height: 80,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.primaryLight,
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.spa_outlined,
             size: 40,
             color: AppColors.primary,

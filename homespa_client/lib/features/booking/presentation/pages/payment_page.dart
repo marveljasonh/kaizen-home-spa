@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/booking_request.dart';
@@ -114,11 +115,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         children: [
           // ── Payment method ────────────────────────────────────────────────
           if (cart.isTotallyFree) ...[
-            const _MethodCard(
+            _MethodCard(
               icon: Icons.card_giftcard_rounded,
-              iconColor: kFlowGold,
+              iconColor: AppColors.goldDark,
               title: 'FREE — Reward Applied',
-              titleColor: kFlowGold,
+              titleColor: AppColors.goldDark,
               subtitle: 'No payment required for this booking',
             ),
             const SizedBox(height: 28),
@@ -155,9 +156,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
 class _MethodCard extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String title;
-  final Color titleColor;
+  final Color? titleColor;
   final String subtitle;
   final bool selected;
 
@@ -165,8 +166,8 @@ class _MethodCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.iconColor = Colors.white,
-    this.titleColor = Colors.white,
+    this.iconColor,
+    this.titleColor,
     this.selected = false,
   });
 
@@ -180,14 +181,14 @@ class _MethodCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: AppColors.glassFill,
               borderRadius: BorderRadius.circular(kFlowRadius),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: AppColors.tint(0.3),
                 width: 0.5,
               ),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: iconColor ?? AppColors.fg, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -199,7 +200,7 @@ class _MethodCard extends StatelessWidget {
                   style: flowBody(
                     15,
                     weight: FontWeight.w600,
-                    color: titleColor,
+                    color: titleColor ?? AppColors.fg,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -229,10 +230,10 @@ class _OrderSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.glassFill,
         borderRadius: BorderRadius.circular(kFlowRadius),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: AppColors.tint(0.5),
           width: 0.5,
         ),
       ),
@@ -305,7 +306,7 @@ class _OrderSummaryCard extends StatelessWidget {
                       style: flowBody(
                         11,
                         weight: FontWeight.w700,
-                        color: kFlowGold,
+                        color: AppColors.goldDark,
                       ),
                     ),
                   ),
@@ -326,7 +327,7 @@ class _OrderSummaryCard extends StatelessWidget {
                   ? 'Voucher (${cart.voucher!.code})'
                   : 'Discount',
               value: '-${formatRupiah(cart.discountAmount)}',
-              valueColor: kFlowGold,
+              valueColor: AppColors.goldDark,
             ),
           ],
 
@@ -340,7 +341,7 @@ class _OrderSummaryCard extends StatelessWidget {
                 cart.isTotallyFree ? 'FREE' : formatRupiah(cart.total),
                 style: flowHeading(
                   22,
-                  color: cart.isTotallyFree ? kFlowGold : Colors.white,
+                  color: cart.isTotallyFree ? AppColors.goldDark : AppColors.fg,
                 ),
               ),
             ],
@@ -372,7 +373,7 @@ class _SummaryRow extends StatelessWidget {
         : flowBody(
             13,
             weight: FontWeight.w500,
-            color: valueColor ?? Colors.white,
+            color: valueColor ?? AppColors.fg,
           );
 
     return Row(
@@ -399,7 +400,7 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Divider(height: 1, color: Colors.white.withValues(alpha: 0.3)),
+    child: Divider(height: 1, color: AppColors.tint(0.3)),
   );
 }
 
@@ -436,7 +437,7 @@ class _SuccessScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: kFlowAccent,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.2),
+                        border: Border.all(color: kFlowSelectedBorder, width: 1.2),
                         boxShadow: kFlowCardShadow,
                       ),
                       child: const Icon(
@@ -460,10 +461,10 @@ class _SuccessScreen extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
+                        color: AppColors.glassFill,
                         borderRadius: BorderRadius.circular(kFlowRadius),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: AppColors.tint(0.5),
                           width: 0.5,
                         ),
                       ),

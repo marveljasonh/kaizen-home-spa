@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/i18n/app_lang.dart';
+
 /// Therapist shown in the chat header, plus the booking's status.
 class ChatBookingInfo {
   final String? therapistId;
@@ -28,7 +30,7 @@ final chatBookingInfoProvider = FutureProvider.autoDispose
           .single();
       final therapistId = booking['therapist_id'] as String?;
 
-      String name = 'Therapist';
+      String name = tr('Therapist');
       String? avatarUrl;
       if (therapistId != null) {
         final profile = await client

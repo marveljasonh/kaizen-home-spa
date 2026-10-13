@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/timezone_helper.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/booking_cart.dart';
 import '../widgets/booking_step_indicator.dart';
@@ -97,21 +98,21 @@ class ReviewConfirmPage extends ConsumerWidget {
                     _PriceRow(
                       label: 'Voucher (${cart.voucher!.code})',
                       value: '-${formatRupiah(cart.discountAmount)}',
-                      valueColor: kFlowGold,
+                      valueColor: AppColors.goldDark,
                     ),
                   if (cart.rewardDiscount != null)
                     _PriceRow(
                       label: 'Reward Discount',
                       value: '-${formatRupiah(cart.rewardDiscount!)}',
-                      valueColor: kFlowGold,
+                      valueColor: AppColors.goldDark,
                     ),
                 ],
-                Divider(height: 24, color: Colors.white.withValues(alpha: 0.2)),
+                Divider(height: 24, color: AppColors.tint(0.2)),
                 _PriceRow(
                   label: 'Total',
                   value: cart.isTotallyFree ? 'FREE' : formatRupiah(cart.total),
                   isBold: true,
-                  valueColor: cart.isTotallyFree ? kFlowGold : null,
+                  valueColor: cart.isTotallyFree ? AppColors.goldDark : null,
                   isLast: true,
                 ),
               ],
@@ -120,17 +121,17 @@ class ReviewConfirmPage extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.10),
+                color: AppColors.glassFill,
                 borderRadius: BorderRadius.circular(kFlowRadius),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.tint(0.5),
                   width: 0.5,
                 ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline_rounded,
                     color: kFlowMuted,
                     size: 18,
@@ -227,7 +228,7 @@ class _DetailRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 18, color: Colors.white),
+              Icon(icon, size: 18, color: AppColors.fg),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -245,7 +246,7 @@ class _DetailRow extends StatelessWidget {
         if (!isLast)
           Divider(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.2),
+            color: AppColors.tint(0.2),
             indent: 30,
           ),
       ],
@@ -280,7 +281,11 @@ class _FreeItemRow extends StatelessWidget {
             ),
             child: Text(
               'FREE',
-              style: flowBody(11, weight: FontWeight.w700, color: kFlowGold),
+              style: flowBody(
+                11,
+                weight: FontWeight.w700,
+                color: AppColors.goldDark,
+              ),
             ),
           ),
         ],
@@ -310,8 +315,8 @@ class _PriceRow extends StatelessWidget {
         ? flowHeading(22)
         : flowBody(13, color: kFlowMuted);
     final valueStyle = isBold
-        ? flowHeading(22, color: valueColor ?? Colors.white)
-        : flowBody(13, color: valueColor ?? Colors.white);
+        ? flowHeading(22, color: valueColor ?? AppColors.fg)
+        : flowBody(13, color: valueColor ?? AppColors.fg);
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
       child: Row(

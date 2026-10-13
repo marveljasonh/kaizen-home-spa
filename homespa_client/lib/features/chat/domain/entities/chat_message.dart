@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../../../../core/i18n/app_lang.dart';
+
 /// Delivery state of a message this client sent from this device.
 enum ChatSendState { sent, sending, failed }
 
@@ -45,7 +47,7 @@ class ChatMessage {
   bool get isPhoto => imagePath != null || localImage != null;
 
   /// For previews and notifications: the text, or "Photo" without one.
-  String get previewText => body.trim().isNotEmpty ? body : 'Photo';
+  String get previewText => body.trim().isNotEmpty ? body : tr('Photo');
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
     id: json['id'].toString(),

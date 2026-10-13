@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../../core/utils/timezone_helper.dart';
+import '../../../../core/utils/timezone_helper.dart';
 
 import '../../data/datasources/booking_remote_datasource.dart';
 import '../../data/repositories/booking_repository_impl.dart';

@@ -1,0 +1,143 @@
+// Indonesian strings for one feature group (see strings_id.dart).
+// Auth (login, sign-up, phone verify, forgot password), onboarding welcome, client intake.
+const Map<String, String> kStringsIdG = {
+  'Email': 'Email',
+  'Email is required': 'Email wajib diisi',
+  'Enter a valid email': 'Masukkan email yang valid',
+  'Password': 'Kata sandi',
+  'Password is required': 'Kata sandi wajib diisi',
+  'Forgot password?': 'Lupa kata sandi?',
+  'Sign In': 'Masuk',
+  'SIGN IN': 'MASUK',
+  'Don\'t have an account?': 'Belum punya akun?',
+  'Sign Up': 'Daftar',
+  'Your wellness journey starts here':
+      'Perjalanan kesehatan dan kebugaran Anda dimulai di sini',
+  'Full Name': 'Nama Lengkap',
+  'Jane Doe': 'Budi Santoso',
+  'Name is required': 'Nama wajib diisi',
+  'Password must be at least 8 characters': 'Kata sandi minimal 8 karakter',
+  'Confirm Password': 'Konfirmasi Kata Sandi',
+  'Passwords do not match': 'Kata sandi tidak cocok',
+  'Phone Number': 'Nomor Telepon',
+  'Phone number is required': 'Nomor telepon wajib diisi',
+  'Enter a valid phone number': 'Masukkan nomor telepon yang valid',
+  'Gender': 'Jenis Kelamin',
+  'Male': 'Laki-laki',
+  'Female': 'Perempuan',
+  'Please select your gender': 'Silakan pilih jenis kelamin Anda',
+  'Create Account': 'Buat Akun',
+  'CREATE ACCOUNT': 'BUAT AKUN',
+  'Already have an account?': 'Sudah punya akun?',
+  'Start your wellness journey with us':
+      'Mulai perjalanan kesehatan dan kebugaran Anda bersama kami',
+  'Code resent successfully': 'Kode berhasil dikirim ulang',
+  'Could not resend: {}': 'Tidak dapat mengirim ulang: {}',
+  'Verify Your Phone': 'Verifikasi Nomor Telepon Anda',
+  'Enter the 6-digit code sent to\n{}':
+      'Masukkan kode 6 digit yang dikirim ke\n{}',
+  'Verify': 'Verifikasi',
+  'VERIFY': 'VERIFIKASI',
+  'Didn\'t receive the code?': 'Belum menerima kode?',
+  'Sending…': 'Mengirim…',
+  'Resend': 'Kirim Ulang',
+  'Skip for now': 'Lewati untuk sekarang',
+  'Your Relaxation\nExperience Starts\nHere':
+      'Pengalaman Relaksasi\nAnda Dimulai\nDi Sini',
+  'Take a moment to relax and recharge. Enjoy a soothing spa experience in the comfort of your home, created to leave you feeling refreshed and renewed.':
+      'Luangkan waktu sejenak untuk bersantai dan memulihkan energi. Nikmati pengalaman spa yang menenangkan dari kenyamanan rumah Anda, dirancang agar Anda merasa segar dan bugar kembali.',
+  'Get Started': 'Mulai',
+  'GET STARTED': 'MULAI',
+  'Client Intake Form': 'Formulir Data Klien',
+  'Question {} of {}': 'Pertanyaan {} dari {}',
+  'Back': 'Kembali',
+  'Continue': 'Lanjutkan',
+  'Save Changes': 'Simpan Perubahan',
+  'Finish': 'Selesai',
+  'Preferences updated': 'Preferensi diperbarui',
+  'Couldn’t save your answers. Please try again.':
+      'Jawaban Anda tidak dapat disimpan. Silakan coba lagi.',
+  'I have indications of the following health conditions.':
+      'Saya memiliki indikasi kondisi kesehatan berikut.',
+  '(Shared to ensure a safe and comfortable treatment.)':
+      '(Dibagikan demi perawatan yang aman dan nyaman.)',
+  'Which body areas would you like to receive more intensive focus?':
+      'Bagian tubuh mana yang ingin Anda dapatkan fokus lebih intensif?',
+  '(The therapist will still massage the full body according to SOP)':
+      '(Terapis tetap akan memijat seluruh tubuh sesuai SOP)',
+  'What type of pressure would you like?':
+      'Tekanan pijat seperti apa yang Anda inginkan?',
+  '(Applied within standard massage procedures.)':
+      '(Diterapkan sesuai prosedur pijat standar.)',
+  'Are there any specific body areas you prefer not to be massaged?':
+      'Apakah ada bagian tubuh tertentu yang tidak ingin dipijat?',
+  '(The therapist does not massage the genital area, abdomen, thighs, buttocks for male clients, or the breasts, except for postnatal massage.)':
+      '(Terapis tidak memijat area kelamin, perut, paha, dan bokong untuk klien pria, maupun area payudara, kecuali untuk pijat pascamelahirkan.)',
+  'None of these': 'Tidak ada dari ini',
+  'Stroke': 'Stroke',
+  'Vertigo': 'Vertigo',
+  'Migraine': 'Migrain',
+  'Diabetes': 'Diabetes',
+  'Arthritis': 'Radang sendi',
+  'Pregnant': 'Hamil',
+  'Heart Attack': 'Serangan jantung',
+  'Infection': 'Infeksi',
+  'Cancer': 'Kanker',
+  'Skin Condition': 'Kondisi kulit',
+  'Osteoporosis': 'Osteoporosis',
+  'Fractures': 'Patah tulang',
+  'Hypertension': 'Hipertensi',
+  'High Fever': 'Demam tinggi',
+  'Feet Palms': 'Telapak Kaki',
+  'Lower Back': 'Punggung Bawah',
+  'Calf': 'Betis',
+  'Head': 'Kepala',
+  'Upper Back': 'Punggung Atas',
+  'Arms & Hands': 'Lengan & Tangan',
+  'Inner & Outer Thighs': 'Paha Dalam & Luar',
+  'Light Pressure': 'Tekanan Ringan',
+  'Medium Pressure': 'Tekanan Sedang',
+  'Firm Pressure': 'Tekanan Kuat',
+  'Yes (Insert Body Area)': 'Ya (Tulis Bagian Tubuh)',
+  'No Preference': 'Tidak Ada Preferensi',
+  'e.g. Neck, left shoulder': 'mis. Leher, bahu kiri',
+  'Reset link sent again': 'Tautan atur ulang telah dikirim kembali',
+  'Enter the email linked to your account and we\'ll send you a link to reset your password.':
+      'Masukkan email yang terhubung dengan akun Anda dan kami akan mengirimkan tautan untuk mengatur ulang kata sandi Anda.',
+  'Send Reset Link': 'Kirim Tautan Atur Ulang',
+  'SEND RESET LINK': 'KIRIM TAUTAN ATUR ULANG',
+  'Remember your password?': 'Ingat kata sandi Anda?',
+  'Check your email': 'Periksa email Anda',
+  'We\'ve sent a password reset link to':
+      'Kami telah mengirimkan tautan atur ulang kata sandi ke',
+  'Can\'t find it? Check your spam folder.':
+      'Tidak menemukannya? Periksa folder spam Anda.',
+  'Back to Sign In': 'Kembali ke Halaman Masuk',
+  'BACK TO SIGN IN': 'KEMBALI KE HALAMAN MASUK',
+  'Resend link in {}s': 'Kirim ulang tautan dalam {}d',
+  'Resend link': 'Kirim ulang tautan',
+  'Use a different email': 'Gunakan email lain',
+  'Sign in failed': 'Gagal masuk',
+  'Sign up failed': 'Gagal mendaftar',
+  'Sign up failed. Please try again.': 'Gagal mendaftar. Silakan coba lagi.',
+  'Invalid login credentials': 'Email atau kata sandi salah',
+  'User already registered': 'Pengguna sudah terdaftar',
+  'Email not confirmed': 'Email belum dikonfirmasi',
+  'Password should be at least 6 characters.': 'Kata sandi minimal 6 karakter.',
+  'Password should be at least 6 characters': 'Kata sandi minimal 6 karakter',
+  'Signup requires a valid password':
+      'Pendaftaran memerlukan kata sandi yang valid',
+  'Unable to validate email address: invalid format':
+      'Tidak dapat memvalidasi alamat email: format tidak valid',
+  'Email rate limit exceeded': 'Batas pengiriman email terlampaui',
+  'Invalid token or token has expired':
+      'Kode tidak valid atau sudah kedaluwarsa',
+  'Token has expired or is invalid': 'Kode sudah kedaluwarsa atau tidak valid',
+  'New password should be different from the old password.':
+      'Kata sandi baru harus berbeda dari kata sandi lama.',
+  'Signups not allowed for this instance': 'Pendaftaran tidak diizinkan',
+  'Database error saving new user':
+      'Terjadi kesalahan saat menyimpan pengguna baru',
+  'For security purposes, you can only request this after {} seconds.':
+      'Demi keamanan, Anda hanya dapat meminta ini setelah {} detik.',
+};

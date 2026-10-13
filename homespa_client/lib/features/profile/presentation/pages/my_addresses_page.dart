@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../../core/widgets/kaizen_page.dart';
 import '../../data/address_repository.dart';
@@ -136,12 +137,12 @@ class _AddressCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(_labelIcon(address.label), size: 18, color: Colors.white),
+              Icon(_labelIcon(address.label), size: 18, color: AppColors.fg),
               const SizedBox(width: 8),
               Flexible(child: KaizenPill(address.label)),
               if (address.isDefault) ...[
                 const SizedBox(width: 8),
-                const KaizenPill('Default', color: kStatusActive),
+                KaizenPill('Default', color: kStatusActive),
               ],
             ],
           ),
@@ -251,7 +252,7 @@ class _CardSkeleton extends StatelessWidget {
     child: Container(
       height: 140,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: AppColors.tint(0.06),
         borderRadius: BorderRadius.circular(kGlassCardRadius),
       ),
     ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -93,7 +93,7 @@ class ProfilePage extends ConsumerWidget {
                 icon: Icons.chat_bubble_outline_rounded,
                 title: 'Contact Us',
                 subtitle: 'Chat with us on WhatsApp',
-                onTap: () => _launchUrl('https://wa.me/6281234567890'),
+                onTap: () => context.push('/contact'),
               ),
             ],
           ),
@@ -204,7 +204,7 @@ class ProfilePage extends ConsumerWidget {
           padding: const EdgeInsets.only(top: 24),
           child: Column(
             children: [
-              const Icon(Icons.spa_outlined, color: AppColors.gold, size: 20),
+              Icon(Icons.spa_outlined, color: AppColors.goldDark, size: 20),
               const SizedBox(height: 6),
               Text(
                 'Kaizen Home Spa v1.0.0',
@@ -273,7 +273,7 @@ class ProfilePage extends ConsumerWidget {
     _showScrollSheet(
       context,
       title: 'Help Center',
-      children: const [
+      children: [
         _FaqItem(
           q: 'How do I book a session?',
           a: 'Go to Treatments, select your preferred treatment, choose a duration and any add-ons, then proceed through the booking flow to confirm.',
@@ -322,7 +322,7 @@ class ProfilePage extends ConsumerWidget {
 
 // ── Sheets ────────────────────────────────────────────────────────────────────
 
-/// #313129 bottom sheet with a handle and the dark flow theme.
+/// Header-coloured bottom sheet (#313129 dark / white light) with a handle and the flow theme.
 Future<void> _showDarkSheet(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -331,7 +331,7 @@ Future<void> _showDarkSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: scrollControlled,
-    backgroundColor: AppColors.secondary,
+    backgroundColor: AppColors.header,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -403,14 +403,14 @@ class _ProfileHeroRow extends StatelessWidget {
                 (user.name?.trim().isNotEmpty ?? false) ? user.name! : 'Guest',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: flowHeading(22, height: 1.2),
+                style: flowHeading(22, color: Colors.white, height: 1.2),
               ),
               const SizedBox(height: 2),
               Text(
                 user.email,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: flowBody(12.5, color: kFlowMuted, height: 1.35),
+                style: flowBody(12.5, color: Colors.white70, height: 1.35),
               ),
             ],
           ),
@@ -468,7 +468,7 @@ class _PointsCard extends StatelessWidget {
                       ),
                       TextSpan(
                         text: '  pts',
-                        style: flowBody(14, color: Colors.white70),
+                        style: flowBody(14, color: kFlowMuted),
                       ),
                     ],
                   ),
@@ -476,7 +476,7 @@ class _PointsCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white),
+          Icon(Icons.chevron_right_rounded, color: AppColors.fg),
         ],
       ),
     );
@@ -502,7 +502,7 @@ class _MenuCard extends StatelessWidget {
                 height: 0.5,
                 thickness: 0.5,
                 indent: 16 + 44 + 14,
-                color: Colors.white.withValues(alpha: 0.15),
+                color: AppColors.tint(0.15),
               ),
             rows[i],
           ],
@@ -519,7 +519,7 @@ class _MenuRow extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onTap;
   final Widget? trailing;
-  final Color color;
+  final Color? color;
   final bool showChevron;
 
   const _MenuRow({
@@ -528,12 +528,13 @@ class _MenuRow extends StatelessWidget {
     this.subtitle,
     this.onTap,
     this.trailing,
-    this.color = Colors.white,
+    this.color,
     this.showChevron = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.fg;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -560,7 +561,7 @@ class _MenuRow extends StatelessWidget {
             if (trailing != null)
               trailing!
             else if (showChevron && onTap != null)
-              const Icon(Icons.chevron_right_rounded, color: kFlowMuted),
+              Icon(Icons.chevron_right_rounded, color: kFlowMuted),
           ],
         ),
       ),
@@ -577,13 +578,11 @@ class _Switch extends StatelessWidget {
   Widget build(BuildContext context) => Switch(
     value: value,
     onChanged: onChanged,
-    activeThumbColor: AppColors.darkOliveLight,
-    activeTrackColor: Colors.white,
-    inactiveThumbColor: Colors.white,
-    inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
-    trackOutlineColor: WidgetStatePropertyAll(
-      Colors.white.withValues(alpha: 0.3),
-    ),
+    activeThumbColor: AppColors.btnText,
+    activeTrackColor: AppColors.btnFill,
+    inactiveThumbColor: AppColors.isDark ? Colors.white : AppColors.fgFaint,
+    inactiveTrackColor: AppColors.tint(0.2),
+    trackOutlineColor: WidgetStatePropertyAll(AppColors.tint(0.3)),
   );
 }
 
@@ -625,10 +624,10 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     return Theme(
       data: flowTheme(context),
       child: Dialog(
-        backgroundColor: AppColors.secondary, // #313129
+        backgroundColor: AppColors.header, // #313129 dark / white light
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+          side: BorderSide(color: AppColors.tint(0.15)),
         ),
         insetPadding: const EdgeInsets.symmetric(horizontal: kPageGutterLeft),
         child: Padding(
@@ -695,7 +694,7 @@ class _SheetHandle extends StatelessWidget {
       width: 36,
       height: 4,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.3),
+        color: AppColors.tint(0.3),
         borderRadius: BorderRadius.circular(2),
       ),
     ),

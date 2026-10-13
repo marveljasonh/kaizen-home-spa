@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/app_lang.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -162,7 +163,7 @@ class _ChatPhotoState extends State<ChatPhoto> {
   Widget _tappable(ImageProvider provider, Widget image) => Semantics(
     image: true,
     button: widget.onOpen != null,
-    label: 'Photo',
+    label: tr('Photo'),
     child: GestureDetector(
       onTap: widget.onOpen == null ? null : () => widget.onOpen!(provider),
       child: image,
@@ -280,7 +281,7 @@ class _ChatPhotoViewerState extends State<_ChatPhotoViewer> {
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: IconButton(
-                    tooltip: 'Close',
+                    tooltip: tr('Close'),
                     iconSize: 28,
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black.withValues(alpha: 0.4),

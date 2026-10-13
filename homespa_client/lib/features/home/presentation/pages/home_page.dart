@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -40,10 +40,10 @@ class HomePage extends ConsumerWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.darkOliveLight, // #4E523B
+        backgroundColor: AppColors.tabPage,
         body: RefreshIndicator(
-          color: AppColors.cream,
-          backgroundColor: AppColors.darkOliveLight,
+          color: AppColors.fg,
+          backgroundColor: AppColors.card,
           onRefresh: () async {
             ref.invalidate(popularTreatmentsProvider);
             ref.invalidate(recentOrdersProvider);
@@ -51,7 +51,7 @@ class HomePage extends ConsumerWidget {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
-            children: const [
+            children: [
               // Hero is edge-to-edge and runs under the status bar.
               _HeroSection(),
               SizedBox(height: 20), // hero ends 295 → title 315
@@ -207,7 +207,7 @@ class _HeroSection extends StatelessWidget {
                       fontSize: 19,
                       background: Colors.white,
                       foreground: _kContactText,
-                      onTap: () => context.go('/profile'),
+                      onTap: () => context.push('/contact'),
                     ),
                   ),
                 ],
@@ -340,10 +340,10 @@ class _SectionTitle extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'CalSans',
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: AppColors.fg,
                     fontSize: 23.741,
                     letterSpacing: 0.2374,
                     height: 32.54 / 23.741,
@@ -356,7 +356,7 @@ class _SectionTitle extends StatelessWidget {
           Text(
             subtitle,
             style: GoogleFonts.montserrat(
-              color: Colors.white,
+              color: AppColors.fg,
               fontSize: 10.898,
               fontWeight: FontWeight.w400,
               height: 1.219,
@@ -391,13 +391,13 @@ class _PopularTreatments extends ConsumerWidget {
           padding: listPadding,
           itemCount: 3,
           itemBuilder: (_, __) =>
-              const _CardShell(child: ColoredBox(color: AppColors.darkOlive)),
+              _CardShell(child: ColoredBox(color: AppColors.cardSelected)),
         ),
         error: (_, __) => Center(
           child: Text(
             'Could not load treatments',
             style: AppTypography.bodySmall.copyWith(
-              color: AppColors.textOnDarkMuted,
+              color: AppColors.fgMuted,
             ),
           ),
         ),
@@ -407,7 +407,7 @@ class _PopularTreatments extends ConsumerWidget {
               child: Text(
                 'No treatments yet',
                 style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.textOnDarkMuted,
+                  color: AppColors.fgMuted,
                 ),
               ),
             );
@@ -476,7 +476,7 @@ class _PopularTreatmentCard extends StatelessWidget {
                 imageUrl: treatment.imageUrl!,
                 fit: BoxFit.cover,
                 placeholder: (_, __) =>
-                    const ColoredBox(color: AppColors.darkOlive),
+                    ColoredBox(color: AppColors.cardSelected),
                 errorWidget: (_, __, ___) => fallback,
               )
             else
@@ -574,7 +574,7 @@ class _RecentOrdersSection extends ConsumerWidget {
                 width: _kOrderCardWidth,
                 margin: const EdgeInsets.only(right: _kOrderCardGap),
                 decoration: BoxDecoration(
-                  color: AppColors.darkOlive,
+                  color: AppColors.cardSelected,
                   borderRadius: BorderRadius.circular(_kOrderRadius),
                 ),
               ),
@@ -617,7 +617,7 @@ class _ViewAllButton extends StatelessWidget {
       onPressed: () => context.go('/bookings?tab=past'),
       // Same height as the title line (32.54) so the subtitle doesn't move.
       style: TextButton.styleFrom(
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.fg,
         minimumSize: const Size(44, 32.54),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.only(left: 8),
@@ -627,9 +627,9 @@ class _ViewAllButton extends StatelessWidget {
         style: GoogleFonts.montserrat(
           fontSize: 12.5,
           fontWeight: FontWeight.w400,
-          color: Colors.white.withValues(alpha: 0.62),
+          color: AppColors.tint(0.62),
           decoration: TextDecoration.underline,
-          decorationColor: Colors.white.withValues(alpha: 0.62),
+          decorationColor: AppColors.tint(0.62),
         ),
       ),
     );

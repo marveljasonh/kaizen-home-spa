@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -97,7 +97,7 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                   onTap: () => ref
                       .read(authNotifierProvider.notifier)
                       .skipPhoneVerification(),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_back_ios_new_rounded,
                     color: AppColors.textPrimary,
                   ),
@@ -107,11 +107,11 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
               Container(
                 width: 72,
                 height: 72,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.phone_android_rounded,
                   size: 36,
                   color: AppColors.primary,
@@ -156,15 +156,15 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
+                    borderSide: BorderSide(
                       color: AppColors.primary,
                       width: 1.5,
                     ),
@@ -186,12 +186,12 @@ class _PhoneVerifyPageState extends ConsumerState<PhoneVerifyPage> {
                   ),
                 ),
                 child: isLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppColors.btnText,
                         ),
                       )
                     : const Text(

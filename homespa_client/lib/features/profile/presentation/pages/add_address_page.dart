@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
@@ -240,8 +240,9 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
                 textCapitalization: TextCapitalization.sentences,
                 style: flowBody(14, height: 1.4),
                 decoration: InputDecoration(
-                  hintText:
-                      'e.g. Jl. Sudirman No. 45, Kelurahan Senayan, Jakarta Selatan',
+                  hintText: tr(
+                    'e.g. Jl. Sudirman No. 45, Kelurahan Senayan, Jakarta Selatan',
+                  ),
                   suffixIcon: _isGeocoding
                       ? const Padding(
                           padding: EdgeInsets.all(14),
@@ -268,8 +269,8 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
                   controller: _customLabelCtrl,
                   textCapitalization: TextCapitalization.words,
                   style: flowBody(14),
-                  decoration: const InputDecoration(
-                    hintText: "Custom label (e.g. Parents' House)",
+                  decoration: InputDecoration(
+                    hintText: tr("Custom label (e.g. Parents' House)"),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -282,8 +283,8 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
                 controller: _notesCtrl,
                 maxLines: 2,
                 style: flowBody(14),
-                decoration: const InputDecoration(
-                  hintText: 'Gate code, landmarks, floor number…',
+                decoration: InputDecoration(
+                  hintText: tr('Gate code, landmarks, floor number…'),
                 ),
               ),
               const SizedBox(height: 20),
@@ -313,12 +314,14 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
                     Switch(
                       value: _isDefault,
                       onChanged: (v) => setState(() => _isDefault = v),
-                      activeThumbColor: AppColors.darkOliveLight,
-                      activeTrackColor: Colors.white,
-                      inactiveThumbColor: Colors.white,
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+                      activeThumbColor: AppColors.btnText,
+                      activeTrackColor: AppColors.btnFill,
+                      inactiveThumbColor: AppColors.isDark
+                          ? Colors.white
+                          : AppColors.fgFaint,
+                      inactiveTrackColor: AppColors.tint(0.2),
                       trackOutlineColor: WidgetStatePropertyAll(
-                        Colors.white.withValues(alpha: 0.3),
+                        AppColors.tint(0.3),
                       ),
                     ),
                   ],
@@ -341,9 +344,9 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
       child: Container(
         height: _kMapHeight,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.10),
+          color: AppColors.glassFill,
           borderRadius: radius,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          border: Border.all(color: AppColors.glassBorder),
           boxShadow: kFlowCardShadow,
         ),
         padding: const EdgeInsets.all(1),
@@ -369,11 +372,11 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
               ),
 
               // Fixed centre pin — stays still while the map moves.
-              const IgnorePointer(
+              IgnorePointer(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.location_pin, size: 52, color: kFlowHeaderColor),
+                    Icon(Icons.location_pin, size: 52, color: AppColors.secondary),
                     SizedBox(height: 24),
                   ],
                 ),
@@ -387,16 +390,16 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
                   heroTag: null,
                   onPressed: _isLocating ? null : _goToMyLocation,
                   backgroundColor: kFlowCardColor,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.fg,
                   elevation: 4,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(kFlowRadius),
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppColors.tint(0.5),
                       width: 0.5,
                     ),
                   ),
-                  tooltip: 'Use my location',
+                  tooltip: tr('Use my location'),
                   child: _isLocating
                       ? const SizedBox(
                           width: 18,

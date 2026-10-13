@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -369,7 +369,7 @@ class _OrderMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Order options',
+      label: tr('Order options'),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => showOrderSupportSheet(context, bookingCode),
@@ -398,7 +398,7 @@ Future<void> showOrderSupportSheet(BuildContext context, String bookingCode) {
 
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.cream,
+    backgroundColor: AppColors.header,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -416,34 +416,36 @@ Future<void> showOrderSupportSheet(BuildContext context, String bookingCode) {
                 style: GoogleFonts.montserrat(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: AppColors.fgMuted,
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.support_agent_outlined,
-                color: AppColors.primary,
+                color: AppColors.fg,
               ),
               title: const Text('Request Help'),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 openWhatsApp(
-                  'Hi Kaizen, I need help with my order #$bookingCode.',
+                  tr('Hi Kaizen, I need help with my order #$bookingCode.'),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.report_outlined,
-                color: AppColors.primary,
+                color: AppColors.fg,
               ),
               title: const Text('Report an Issue'),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 openWhatsApp(
-                  'Hi Kaizen, I would like to report an issue with my order '
-                  '#$bookingCode.',
+                  tr(
+                    'Hi Kaizen, I would like to report an issue with my order '
+                    '#$bookingCode.',
+                  ),
                 );
               },
             ),
