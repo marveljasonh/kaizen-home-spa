@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/content/content_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/timezone_helper.dart';
@@ -24,8 +25,17 @@ const double _kRadius = 4.603;
 /// it so both pills stay in sync.
 const double _kTagRadius = 3.32;
 
-/// Support line, shared with Profile → Contact Us.
+/// Fallback support line when the dashboard hasn't set one (App Content →
+/// Contact & Support). Normalized digits for wa.me.
 const String kSupportWhatsApp = '6281234567890';
+
+String _waDigits(String? phone) {
+  final d = (phone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+  if (d.isEmpty) return kSupportWhatsApp;
+  if (d.startsWith('0')) return '62${d.substring(1)}';
+  if (d.startsWith('8')) return '62$d';
+  return d;
+}
 
 /// Figma tag style (order code / status): white 20% fill, hairline white
 /// border, corners 3.32, 16.6 tall, Montserrat 8.4.
@@ -387,9 +397,22 @@ class _OrderMenuButton extends StatelessWidget {
 }
 
 Future<void> showOrderSupportSheet(BuildContext context, String bookingCode) {
-  Future<void> openWhatsApp(String message) async {
+  // Dashboard-editable numbers (App Content → Contact & Support); the
+  // fetch is best-effort and falls back to the built-in line.
+  final container = ProviderScope.containerOf(context, listen: false);
+
+  Future<void> openWhatsApp(String message, {required bool reportIssue}) async {
+    SupportContacts contacts = const SupportContacts();
+    try {
+      contacts = await container.read(supportContactsProvider.future);
+    } catch (_) {}
+    final phone = _waDigits(
+      reportIssue
+          ? (contacts.reportIssuePhone ?? contacts.requestHelpPhone)
+          : (contacts.requestHelpPhone ?? contacts.reportIssuePhone),
+    );
     final uri = Uri.parse(
-      'https://wa.me/$kSupportWhatsApp?text=${Uri.encodeComponent(message)}',
+      'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -430,6 +453,7 @@ Future<void> showOrderSupportSheet(BuildContext context, String bookingCode) {
                 Navigator.of(sheetContext).pop();
                 openWhatsApp(
                   tr('Hi Kaizen, I need help with my order #$bookingCode.'),
+                  reportIssue: false,
                 );
               },
             ),
@@ -446,6 +470,7 @@ Future<void> showOrderSupportSheet(BuildContext context, String bookingCode) {
                     'Hi Kaizen, I would like to report an issue with my order '
                     '#$bookingCode.',
                   ),
+                  reportIssue: true,
                 );
               },
             ),

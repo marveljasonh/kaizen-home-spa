@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/content/content_providers.dart';
 import '../../../../core/providers/app_preferences_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -137,19 +138,35 @@ class ProfilePage extends ConsumerWidget {
               _MenuRow(
                 icon: Icons.help_outline_rounded,
                 title: 'Help Center',
-                onTap: () => _showFaqSheet(context),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'help',
+                  fallbackTitle: 'Help Center',
+                  fallback: null, // built-in FAQ sheet
+                ),
               ),
               _MenuRow(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy Policy',
-                onTap: () =>
-                    _showTextSheet(context, 'Privacy Policy', _kPrivacyText),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'privacy',
+                  fallbackTitle: 'Privacy Policy',
+                  fallback: _kPrivacyText,
+                ),
               ),
               _MenuRow(
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
-                onTap: () =>
-                    _showTextSheet(context, 'Terms & Conditions', _kTermsText),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'terms',
+                  fallbackTitle: 'Terms & Conditions',
+                  fallback: _kTermsText,
+                ),
               ),
               _MenuRow(
                 icon: Icons.star_outline_rounded,
@@ -258,6 +275,29 @@ class ProfilePage extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// Opens a support page: dashboard-saved content when present, otherwise
+  /// the built-in copy (null fallback = the FAQ sheet for Help Center).
+  Future<void> _openEditablePage(
+    BuildContext context,
+    WidgetRef ref, {
+    required String key,
+    required String fallbackTitle,
+    required String? fallback,
+  }) async {
+    ContentPage? page;
+    try {
+      page = await ref.read(contentPageProvider(key).future);
+    } catch (_) {}
+    if (!context.mounted) return;
+    if (page != null && page.hasBody) {
+      _showTextSheet(context, page.title ?? fallbackTitle, page.body!);
+    } else if (fallback != null) {
+      _showTextSheet(context, fallbackTitle, fallback);
+    } else {
+      _showFaqSheet(context);
+    }
   }
 
   void _showFaqSheet(BuildContext context) {

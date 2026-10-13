@@ -39,6 +39,8 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
           (c) => TreatmentCategory(
             id: c['id'] as String,
             name: c['name'] as String,
+            header: c['header'] as String?,
+            subheader: c['subheader'] as String?,
           ),
         )
         .toList();
@@ -68,9 +70,13 @@ class TreatmentsRemoteDataSourceImpl implements TreatmentsRemoteDataSource {
             isDefault: i == 0,
           ),
       ];
-      final photoUrl = packages
-          .map((p) => p['photoUrl'] as String?)
-          .firstWhere((u) => u != null && u.isNotEmpty, orElse: () => null);
+      // Admin-uploaded treatment image first, then any package photo.
+      final serviceImage = s['imageUrl'] as String?;
+      final photoUrl = (serviceImage != null && serviceImage.isNotEmpty)
+          ? serviceImage
+          : packages
+                .map((p) => p['photoUrl'] as String?)
+                .firstWhere((u) => u != null && u.isNotEmpty, orElse: () => null);
       return Treatment(
         id: serviceId,
         name: s['name'] as String,

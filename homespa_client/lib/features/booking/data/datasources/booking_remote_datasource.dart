@@ -203,7 +203,10 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
                 'startISO': request.scheduledAt.toUtc().toIso8601String(),
                 if (request.therapistId != null)
                   'therapistId': request.therapistId,
-                'paymentMethod': 'cash',
+                'paymentMethod':
+                    request.paymentMethodId == 'reward'
+                        ? 'cash'
+                        : request.paymentMethodId,
                 if (request.addressNotes?.isNotEmpty ?? false)
                   'notes': request.addressNotes,
                 if (request.voucherCode != null)
