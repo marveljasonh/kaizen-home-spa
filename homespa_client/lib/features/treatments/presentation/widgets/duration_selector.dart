@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 
-import '../../../../../core/theme/app_colors.dart';
-import '../../../../../core/utils/currency_formatter.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/treatment_duration.dart';
 
 class DurationSelector extends StatelessWidget {
@@ -30,11 +30,11 @@ class DurationSelector extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+              color: isSelected ? AppColors.btnFill : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isSelected
-                    ? AppColors.primary
+                    ? AppColors.btnFill
                     : AppColors.border.withValues(alpha: 0.25),
               ),
             ),
@@ -44,7 +44,7 @@ class DurationSelector extends StatelessWidget {
                 Text(
                   '${d.durationMinutes} min',
                   style: text.labelLarge?.copyWith(
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                    color: isSelected ? AppColors.btnText : AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -53,7 +53,7 @@ class DurationSelector extends StatelessWidget {
                   formatRupiah(d.price),
                   style: text.labelSmall?.copyWith(
                     color: isSelected
-                        ? Colors.white.withValues(alpha: 0.85)
+                        ? AppColors.btnText.withValues(alpha: 0.85)
                         : AppColors.textSecondary,
                   ),
                 ),

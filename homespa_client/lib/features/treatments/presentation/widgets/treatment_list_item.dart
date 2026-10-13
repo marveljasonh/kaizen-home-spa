@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../../../../../core/theme/app_colors.dart';
-import '../../../../../core/theme/app_typography.dart';
-import '../../../../../core/utils/currency_formatter.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/treatment.dart';
 
 class TreatmentListItem extends StatelessWidget {
@@ -21,7 +21,7 @@ class TreatmentListItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
           boxShadow: [
@@ -118,7 +118,7 @@ class TreatmentListItem extends StatelessWidget {
                     // Duration + price row
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.access_time_rounded,
                           size: 12,
                           color: AppColors.textMuted,
@@ -154,7 +154,7 @@ class TreatmentListItem extends StatelessWidget {
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_right_rounded,
                   color: AppColors.primary,
                   size: 18,
@@ -179,7 +179,7 @@ class TreatmentListItemSkeleton extends StatelessWidget {
       child: Container(
         height: 116,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),

@@ -32,6 +32,9 @@ Map<String, dynamic> _rewardShape(Map<String, dynamic> r) => {
   // The reward's platform package id — createBooking books exactly this.
   'reward_treatment_id': r['packageId'],
   'reward_treatment': {'name': r['packageName']},
+  // Card artwork; null until the platform serves reward/treatment images.
+  'image_url': r['imageUrl'],
+  'reward_treatment_image_url': r['packageImageUrl'],
   'reward_duration': {
     'duration_minutes': (r['packageDurationMin'] as num?)?.toInt(),
   },

@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../core/i18n/material_i18n.dart';
+import '../../../../core/theme/app_colors.dart';
 
 /// Figma "Back" glass button: 49px circle, white 10% fill, 0.746px white 50%
 /// border, SVG icon placed at [iconOffset] (top-left, as positioned in Figma).
@@ -22,6 +24,11 @@ class GlassIconButton extends StatelessWidget {
   /// the button draws no fill or border of its own.
   final bool svgIncludesFrame;
 
+  /// True when the button sits on a themed header/page (not on a photo): in
+  /// light mode it is drawn dark-on-light instead of white-on-dark. Buttons on
+  /// photos keep the default (always white glass).
+  final bool adaptive;
+
   static const double size = 49;
   static const double _border = 0.746;
 
@@ -35,11 +42,14 @@ class GlassIconButton extends StatelessWidget {
     this.badgeCount = 0,
     this.fillAlpha = 0.10,
     this.svgIncludesFrame = false,
+    this.adaptive = false,
   }) : assert((svgAsset == null) != (icon == null)),
        assert(!svgIncludesFrame || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
+    final ink = adaptive && !AppColors.isDark; // dark glass on a light page
+    final iconColor = ink ? AppColors.fg : Colors.white;
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -71,18 +81,25 @@ class GlassIconButton extends StatelessWidget {
                       ),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: fillAlpha),
+                  color: ink
+                      ? AppColors.glassFill
+                      : Colors.white.withValues(alpha: fillAlpha),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.50),
+                    color: ink
+                        ? AppColors.tint(0.25)
+                        : Colors.white.withValues(alpha: 0.50),
                     width: _border,
                   ),
                 ),
                 child: icon != null
-                    ? Icon(icon, size: iconSize, color: Colors.white)
+                    ? Icon(icon, size: iconSize, color: iconColor)
                     : SvgPicture.asset(
                         svgAsset!,
                         width: iconSize,
                         height: iconSize,
+                        colorFilter: ink
+                            ? ColorFilter.mode(iconColor, BlendMode.srcIn)
+                            : null,
                       ),
               ),
             // Badge: 16px white dot at (33, 33), Montserrat Medium 8 #161616.
@@ -94,8 +111,8 @@ class GlassIconButton extends StatelessWidget {
                   width: 16,
                   height: 16,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: ink ? AppColors.btnFill : Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: Text(
@@ -103,7 +120,7 @@ class GlassIconButton extends StatelessWidget {
                     style: GoogleFonts.montserrat(
                       fontSize: 8,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF161616),
+                      color: ink ? Colors.white : const Color(0xFF161616),
                       height: 1,
                     ),
                   ),

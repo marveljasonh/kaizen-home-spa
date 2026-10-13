@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -110,8 +110,8 @@ class _FeaturedBannerState extends State<FeaturedBanner> {
               dotHeight: 6,
               dotWidth: 6,
               spacing: 6,
-              activeDotColor: AppColors.primary,
-              dotColor: AppColors.border,
+              activeDotColor: AppColors.fg,
+              dotColor: AppColors.tint(0.25),
             ),
           ),
         ],

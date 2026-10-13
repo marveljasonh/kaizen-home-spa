@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-
+import '../i18n/material_i18n.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -36,24 +35,26 @@ class KaizenPrimaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (isLoading)
-              const SizedBox(
+              SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: AppColors.btnText,
                 ),
               )
             else ...[
               Text(
                 label.toUpperCase(),
-                style: AppTypography.buttonLabel.copyWith(color: Colors.white),
+                style: AppTypography.buttonLabel.copyWith(
+                  color: AppColors.btnText,
+                ),
               ),
               if (showArrow) ...[
                 const SizedBox(width: 8),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_rounded,
-                  color: Colors.white,
+                  color: AppColors.btnText,
                   size: 18,
                 ),
               ],
@@ -133,7 +134,7 @@ class KaizenSectionHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 2),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_rounded,
                   size: 14,
                   color: AppColors.primary,
@@ -336,7 +337,7 @@ class KaizenBookingField extends StatelessWidget {
               ),
             ),
             if (hasDropdown)
-              const Icon(
+              Icon(
                 Icons.expand_more_rounded,
                 color: AppColors.textMuted,
                 size: 18,

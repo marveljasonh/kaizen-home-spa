@@ -16,6 +16,9 @@ function BranchModal({
 }) {
   const [name, setName] = useState(item?.name ?? '');
   const [address, setAddress] = useState(item?.address ?? '');
+  const [phone, setPhone] = useState(item?.phone ?? '');
+  const [hours, setHours] = useState(item?.operating_hours ?? '');
+  const [error, setError] = useState<string | null>(null);
   const [lat, setLat] = useState(item?.lat?.toString() ?? '');
   const [lng, setLng] = useState(item?.lng?.toString() ?? '');
   const [radiusKm, setRadiusKm] = useState(item?.radius_km?.toString() ?? '');
@@ -26,22 +29,27 @@ function BranchModal({
   async function handleSave() {
     if (!name.trim()) return;
     setSaving(true);
+    setError(null);
     const supabase = createClient();
     const payload: Record<string, unknown> = {
       name,
       address: address || null,
+      phone: phone.trim() || null,
+      operating_hours: hours.trim() || null,
       lat: lat !== '' ? parseFloat(lat) : null,
       lng: lng !== '' ? parseFloat(lng) : null,
       radius_km: radiusKm !== '' ? parseFloat(radiusKm) : null,
       capacity: capacity !== '' ? parseInt(capacity, 10) : null,
       is_active: isActive,
     };
-    if (item?.id) {
-      await supabase.from('branches').update(payload).eq('id', item.id);
-    } else {
-      await supabase.from('branches').insert(payload);
-    }
+    const { error: saveError } = item?.id
+      ? await supabase.from('branches').update(payload).eq('id', item.id)
+      : await supabase.from('branches').insert(payload);
     setSaving(false);
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
     onSaved();
     onClose();
   }
@@ -52,7 +60,7 @@ function BranchModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl border shadow-xl w-full max-w-md" style={{ borderColor: '#EBE4D9' }}>
+      <div className="bg-white rounded-xl border shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ borderColor: '#EBE4D9' }}>
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: '#EBE4D9' }}>
           <h3 className="font-semibold" style={{ color: '#2C2C2A' }}>
             {item?.id ? 'Edit Branch' : 'Add Branch'}
@@ -72,6 +80,17 @@ function BranchModal({
           <div>
             <label className="block text-sm font-medium mb-1.5" style={labelStyle}>Address</label>
             <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} className={`${inputCls} resize-none`} style={inputStyle} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={labelStyle}>WhatsApp number</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0812-3456-7890" className={inputCls} style={inputStyle} />
+            <p className="text-xs mt-1" style={{ color: '#9A9A90' }}>
+              Shown on the client app&apos;s Contact Us page. Use 08… or +62… format.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={labelStyle}>Operating hours</label>
+            <input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Daily, 09:00 – 21:00" className={inputCls} style={inputStyle} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -104,6 +123,11 @@ function BranchModal({
             />
             <label htmlFor="branchIsActive" className="text-sm" style={{ color: '#3D3D38' }}>Active</label>
           </div>
+          {error && (
+            <p className="text-sm rounded-lg px-3 py-2" style={{ backgroundColor: '#FEF2F2', color: '#B91C1C' }}>
+              Could not save: {error}
+            </p>
+          )}
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: '#EBE4D9' }}>
           <button
@@ -180,6 +204,7 @@ export default function BranchesPage() {
                 <tr className="border-b" style={{ backgroundColor: '#FAF7F2', borderColor: '#EBE4D9' }}>
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>Name</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>Address</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>WhatsApp</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>Coordinates</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>Radius / Cap</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: '#7A7A72' }}>Status</th>
@@ -189,7 +214,7 @@ export default function BranchesPage() {
               <tbody>
                 {branches.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center" style={{ color: '#9A9A90' }}>
+                    <td colSpan={7} className="px-5 py-10 text-center" style={{ color: '#9A9A90' }}>
                       No branches found
                     </td>
                   </tr>
@@ -201,6 +226,7 @@ export default function BranchesPage() {
                   >
                     <td className="px-5 py-3 font-medium" style={{ color: '#2C2C2A' }}>{b.name}</td>
                     <td className="px-5 py-3 max-w-xs truncate" style={{ color: '#5A5A52' }}>{b.address ?? '—'}</td>
+                    <td className="px-5 py-3 whitespace-nowrap" style={{ color: '#5A5A52' }}>{b.phone ?? '—'}</td>
                     <td className="px-5 py-3 font-mono text-xs whitespace-nowrap" style={{ color: '#5A5A52' }}>
                       {b.lat != null && b.lng != null ? `${b.lat}, ${b.lng}` : '—'}
                     </td>

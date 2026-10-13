@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -55,8 +55,8 @@ class CategoryTreatmentsView extends ConsumerWidget {
     final treatmentsAsync = ref.watch(treatmentsProvider(categoryId));
 
     return RefreshIndicator(
-      color: AppColors.cream,
-      backgroundColor: AppColors.darkOlive,
+      color: AppColors.fg,
+      backgroundColor: AppColors.card,
       onRefresh: () async => ref.invalidate(treatmentsProvider(categoryId)),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -84,8 +84,8 @@ class CategoryTreatmentsView extends ConsumerWidget {
                   loading: () => Column(
                     children: List.generate(
                       3,
-                      (_) => const _CardFrame(
-                        child: ColoredBox(color: AppColors.darkOlive),
+                      (_) => _CardFrame(
+                        child: ColoredBox(color: AppColors.cardSelected),
                       ),
                     ),
                   ),
@@ -491,7 +491,7 @@ class _Message extends StatelessWidget {
             text,
             style: GoogleFonts.montserrat(
               fontSize: 14,
-              color: AppColors.textOnDarkMuted,
+              color: AppColors.fgMuted,
             ),
           ),
           if (onRetry != null)
@@ -502,7 +502,7 @@ class _Message extends StatelessWidget {
                 style: GoogleFonts.montserrat(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.cream,
+                  color: AppColors.fg,
                 ),
               ),
             ),

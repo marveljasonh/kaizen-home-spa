@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -89,7 +89,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Name is required';
+                          return tr('Name is required');
                         }
                         return null;
                       },
@@ -103,11 +103,11 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Email is required';
+                          return tr('Email is required');
                         }
                         final email = v.trim();
                         if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                          return 'Enter a valid email';
+                          return tr('Enter a valid email');
                         }
                         return null;
                       },
@@ -130,10 +130,10 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Password is required';
+                          return tr('Password is required');
                         }
                         if (v.length < 8) {
-                          return 'Password must be at least 8 characters';
+                          return tr('Password must be at least 8 characters');
                         }
                         return null;
                       },
@@ -155,7 +155,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       ),
                       validator: (v) {
                         if (v != _passwordController.text) {
-                          return 'Passwords do not match';
+                          return tr('Passwords do not match');
                         }
                         return null;
                       },
@@ -169,10 +169,10 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       textInputAction: TextInputAction.done,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Phone number is required';
+                          return tr('Phone number is required');
                         }
                         if (v.trim().length < 8) {
-                          return 'Enter a valid phone number';
+                          return tr('Enter a valid phone number');
                         }
                         return null;
                       },
@@ -215,12 +215,12 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                         ),
                       ),
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: AppColors.btnText,
                               ),
                             )
                           : const Text(

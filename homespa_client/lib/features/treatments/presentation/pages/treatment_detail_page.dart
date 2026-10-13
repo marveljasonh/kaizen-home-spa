@@ -1,16 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../core/theme/app_colors.dart';
-import '../../../../../core/utils/currency_formatter.dart';
-import '../../../../../core/widgets/florian_text.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/florian_text.dart';
 import '../../domain/entities/treatment.dart';
 import '../../domain/entities/treatment_duration.dart';
 import '../providers/treatments_providers.dart';
@@ -26,7 +26,9 @@ const double _kSide = 29;
 // Cards end at x 372, i.e. 30 from the right, while text starts 29 in.
 const double _kSideRight = 30;
 const double _kHeroMinHeight = 379;
-const Color _kBg = Color(0xFF4E523B);
+
+/// Page background under the hero: olive #4E523B (dark) / cream (light).
+Color get _kBg => AppColors.isDark ? AppColors.card : AppColors.page;
 
 /// "What's Included?" rows (Figma 1626:4581 – 4589).
 const List<String> _kIncluded = [
@@ -52,8 +54,8 @@ class TreatmentDetailPage extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: _kBg,
         body: treatmentAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.cream),
+          loading: () => Center(
+            child: CircularProgressIndicator(color: AppColors.fg),
           ),
           error: (e, _) => _ErrorState(
             onRetry: () => ref.invalidate(treatmentDetailProvider(treatmentId)),
@@ -237,7 +239,7 @@ class _PricePill extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 155.844),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: _kBg,
+        color: AppColors.darkOliveLight, // olive pill on the photo, both modes
         borderRadius: BorderRadius.circular(5.06),
         boxShadow: const [
           BoxShadow(color: Color(0x38000000), blurRadius: 4.048), // 22%
@@ -368,10 +370,16 @@ class _OptionCard extends StatelessWidget {
             border: Border.all(
               color: selected
                   ? Colors.white.withValues(alpha: 0.5)
-                  : Colors.transparent,
+                  : (AppColors.isDark
+                        ? Colors.transparent
+                        : AppColors.tint(0.12)),
               width: _border,
             ),
-            color: selected ? null : const Color(0x26BCBDB5), // 15%
+            color: selected
+                ? null
+                : (AppColors.isDark
+                      ? const Color(0x26BCBDB5) // 15%
+                      : AppColors.card),
             gradient: selected
                 ? LinearGradient(
                     begin: Alignment(-_dx, -_dy),
@@ -394,7 +402,7 @@ class _OptionCard extends StatelessWidget {
                   style: GoogleFonts.montserrat(
                     fontSize: 21.713,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: selected ? Colors.white : AppColors.fg,
                     height: _kFigmaNormal,
                   ),
                 ),
@@ -411,7 +419,7 @@ class _OptionCard extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w400,
                     fontStyle: FontStyle.italic,
-                    color: Colors.white,
+                    color: selected ? Colors.white : AppColors.fg,
                     height: _kFigmaNormal,
                   ),
                 ),
@@ -498,7 +506,14 @@ class _Included extends StatelessWidget {
                   child: OverflowBox(
                     maxWidth: 17,
                     maxHeight: 17,
-                    child: SvgPicture.asset(_kIconCheck, width: 17, height: 17),
+                    child: SvgPicture.asset(
+                      _kIconCheck,
+                      width: 17,
+                      height: 17,
+                      colorFilter: AppColors.isDark
+                          ? null
+                          : ColorFilter.mode(AppColors.fg, BlendMode.srcIn),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 9),
@@ -576,7 +591,7 @@ class _SectionTitle extends StatelessWidget {
         fontSize: 16,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.16,
-        color: Colors.white.withValues(alpha: 0.71),
+        color: AppColors.tint(0.71),
         height: _kFigmaNormal,
       ),
     );
@@ -597,7 +612,7 @@ class _Muted extends StatelessWidget {
         fontSize: 13,
         fontWeight: FontWeight.w400,
         letterSpacing: 0.13,
-        color: Colors.white.withValues(alpha: 0.45),
+        color: AppColors.tint(0.45),
         height: _kFigmaNormal,
       ),
     );
@@ -618,7 +633,7 @@ class _ErrorState extends StatelessWidget {
             'Could not load treatment',
             style: GoogleFonts.montserrat(
               fontSize: 14,
-              color: AppColors.textOnDarkMuted,
+              color: AppColors.fgMuted,
             ),
           ),
           TextButton(
@@ -628,7 +643,7 @@ class _ErrorState extends StatelessWidget {
               style: GoogleFonts.montserrat(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.cream,
+                color: AppColors.fg,
               ),
             ),
           ),
@@ -638,7 +653,7 @@ class _ErrorState extends StatelessWidget {
               'Back',
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: AppColors.textOnDarkMuted,
+                color: AppColors.fgMuted,
               ),
             ),
           ),

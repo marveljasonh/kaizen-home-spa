@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/i18n/app_lang.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../domain/entities/therapist.dart';
 import '../providers/booking_cart.dart';
@@ -58,8 +60,8 @@ Widget _buildTherapistList(
   Set<String> bookedIds,
 ) {
   return RefreshIndicator(
-    color: kFlowPageColor,
-    backgroundColor: Colors.white,
+    color: AppColors.fg,
+    backgroundColor: AppColors.card,
     onRefresh: () async => ref.invalidate(therapistsProvider),
     child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -71,10 +73,10 @@ Widget _buildTherapistList(
           name: 'Any Available Therapist',
           subtitle:
               "We'll assign the best available therapist for your booking",
-          avatarChild: const Icon(
+          avatarChild: Icon(
             Icons.people_rounded,
             size: 26,
-            color: Colors.white,
+            color: AppColors.fg,
           ),
           onTap: () =>
               ref.read(bookingCartProvider.notifier).selectTherapist(null),
@@ -153,11 +155,11 @@ class _TherapistTile extends StatelessWidget {
   void _handleUnavailableTap(BuildContext context) {
     final String message;
     if (!isAvailable) {
-      message = 'This therapist is currently unavailable';
+      message = tr('This therapist is currently unavailable');
     } else if (isBookedAtTime) {
-      message = 'This therapist is already booked at your selected time';
+      message = tr('This therapist is already booked at your selected time');
     } else {
-      message = 'This therapist is not available';
+      message = tr('This therapist is not available');
     }
     ScaffoldMessenger.of(
       context,
@@ -197,7 +199,7 @@ class _TherapistTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.star_rounded,
                           size: 14,
                           color: kFlowGold,
@@ -288,13 +290,15 @@ String _statusLabel(String? status, bool isAvailable, bool isBookedAtTime) {
 Color _statusColor(String? status, bool isAvailable, bool isBookedAtTime) {
   if (!isAvailable) {
     return switch (status) {
-      'on_duty' => kFlowGold,
-      'break' => const Color(0xFF9FD3DC),
+      'on_duty' => AppColors.goldDark,
+      'break' => AppColors.isDark
+          ? const Color(0xFF9FD3DC)
+          : const Color(0xFF2A7F90),
       _ => kFlowMuted,
     };
   }
-  if (isBookedAtTime) return kFlowGold;
-  return const Color(0xFFB5DDA4);
+  if (isBookedAtTime) return AppColors.goldDark;
+  return AppColors.success;
 }
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
@@ -342,10 +346,10 @@ class _InitialsCircle extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.glassFill,
         shape: BoxShape.circle,
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: AppColors.tint(0.5),
           width: 0.5,
         ),
       ),

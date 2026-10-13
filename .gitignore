@@ -1,0 +1,5 @@
+# Claude Code local settings (jangan di-push)
+.claude/
+
+# macOS
+.DS_Store

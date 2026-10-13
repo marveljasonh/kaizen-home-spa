@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/i18n/app_lang.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/timezone_helper.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -34,7 +35,6 @@ const int _kMinuteStep = 10;
 
 const double _kItemExtent = 56;
 const int _kVisibleItems = 5;
-const Color _kCream = AppColors.surface; // #F5F0E8
 
 /// Schedule step: a Date | Hour | Minutes wheel picker. Times before
 /// now + [_kLeadMinutes] or outside opening hours snap to the earliest valid
@@ -278,9 +278,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: AppColors.tint(0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: AppColors.tint(0.12)),
       ),
       child: Column(
         children: [
@@ -301,10 +301,10 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   child: Container(
                     height: _kItemExtent,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: AppColors.tint(0.06),
                       border: Border.symmetric(
                         horizontal: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.28),
+                          color: AppColors.tint(0.28),
                           width: 0.8,
                         ),
                       ),
@@ -388,6 +388,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   }
 
   static String _ordinal(int day) {
+    if (AppLang.isId) return ''; // Indonesian has no 'st/nd/rd/th' suffixes.
     if (day >= 11 && day <= 13) return 'th';
     return switch (day % 10) {
       1 => 'st',
@@ -452,7 +453,7 @@ class _AvailabilityNote extends StatelessWidget {
       ),
       _Availability.conflict => (
         Icons.error_outline_rounded,
-        const Color(0xFFFFB4A8),
+        AppColors.danger,
         'This therapist is already booked around that time. Please choose '
             'another time or therapist.',
       ),
@@ -490,16 +491,16 @@ class _SummaryBanner extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: AppColors.glassFill,
               borderRadius: BorderRadius.circular(kFlowRadius),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: AppColors.tint(0.5),
                 width: 0.5,
               ),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.calendar_today_rounded,
-              color: Colors.white,
+              color: AppColors.fg,
               size: 20,
             ),
           ),
@@ -622,7 +623,7 @@ class _DateItem extends StatelessWidget {
           style: flowBody(
             9.5,
             weight: FontWeight.w600,
-            color: selected ? _kCream : kFlowMuted,
+            color: selected ? AppColors.fg : kFlowMuted,
           ).copyWith(letterSpacing: 1.1),
         ),
         const SizedBox(height: 2),
@@ -630,8 +631,8 @@ class _DateItem extends StatelessWidget {
           date,
           maxLines: 1,
           style: selected
-              ? flowHeading(19, color: Colors.white)
-              : flowBody(14, color: Colors.white70),
+              ? flowHeading(19, color: AppColors.fg)
+              : flowBody(14, color: AppColors.fgMuted),
         ),
       ],
     );
@@ -656,15 +657,15 @@ class _ValueItem extends StatelessWidget {
         text,
         style: flowBody(
           15,
-          color: Colors.white.withValues(alpha: 0.22),
+          color: AppColors.tint(0.22),
         ).copyWith(decoration: TextDecoration.lineThrough),
       );
     }
     return Text(
       text,
       style: selected
-          ? flowHeading(24, color: Colors.white)
-          : flowBody(16, color: Colors.white70),
+          ? flowHeading(24, color: AppColors.fg)
+          : flowBody(16, color: AppColors.fgMuted),
     );
   }
 }

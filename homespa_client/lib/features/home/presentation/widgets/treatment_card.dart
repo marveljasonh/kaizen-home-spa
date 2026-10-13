@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../../../../../core/theme/app_colors.dart';
-import '../../../../../core/theme/app_typography.dart';
-import '../../../../../core/utils/currency_formatter.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/treatment_preview.dart';
 
 const double _kCardWidth = 180;
@@ -161,7 +161,7 @@ class _Placeholder extends StatelessWidget {
         child: Container(
           width: 60,
           height: 60,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.primaryLight,
             shape: BoxShape.circle,
           ),

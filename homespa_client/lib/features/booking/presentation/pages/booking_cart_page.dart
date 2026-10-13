@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,8 +24,8 @@ const double _kCardGap = 14;
 /// Order card corners (4.603 at 222 wide) at the 341 History width.
 const double _kCardRadius = 4.603 * 341 / 222;
 const double _kButtonRadius = 10;
-const Color _kPillOlive = Color(0xFF5B6240); // Re-Order button
-const Color _kRewardGold = AppColors.gold;
+Color get _kPillOlive => Color(0xFF5B6240); // Re-Order button
+Color get _kRewardGold => AppColors.gold;
 
 TextStyle _montserrat(
   double size, {
@@ -39,11 +39,15 @@ TextStyle _montserrat(
   height: height,
 );
 
-TextStyle _calSans(double size, {double? height}) => TextStyle(
+TextStyle _calSans(
+  double size, {
+  double? height,
+  Color color = Colors.white,
+}) => TextStyle(
   fontFamily: 'CalSans',
   fontWeight: FontWeight.w600,
   fontSize: size,
-  color: Colors.white,
+  color: color,
   height: height,
 );
 
@@ -158,18 +162,21 @@ class _EmptyCart extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(_kGutterLeft, 40, _kGutterRight, 0),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.shopping_bag_outlined,
             size: 48,
-            color: AppColors.textOnDarkMuted,
+            color: AppColors.fgMuted,
           ),
           const SizedBox(height: 16),
-          Text('Your cart is empty', style: _calSans(22)),
+          Text(
+            'Your cart is empty',
+            style: _calSans(22, color: AppColors.fg),
+          ),
           const SizedBox(height: 8),
           Text(
             'Add a treatment to start your booking.',
             textAlign: TextAlign.center,
-            style: _montserrat(13, color: AppColors.textOnDarkMuted),
+            style: _montserrat(13, color: AppColors.fgMuted),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -448,8 +455,8 @@ class _OrderSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAllFree = cart.isFree && cart.items.isEmpty;
-    final muted = _montserrat(13, color: AppColors.textOnDarkMuted);
-    final value = _montserrat(13);
+    final muted = _montserrat(13, color: AppColors.fgMuted);
+    final value = _montserrat(13, color: AppColors.fg);
 
     Widget line(String label, String amount, {TextStyle? amountStyle}) =>
         Padding(
@@ -467,17 +474,14 @@ class _OrderSummary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.isDark ? AppColors.glassFill : AppColors.card,
         borderRadius: BorderRadius.circular(_kButtonRadius),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 0.5,
-        ),
+        border: Border.all(color: AppColors.tint(0.5), width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Order Summary', style: _calSans(20)),
+          Text('Order Summary', style: _calSans(20, color: AppColors.fg)),
           const SizedBox(height: 16),
 
           // Free reward line
@@ -488,7 +492,7 @@ class _OrderSummary extends StatelessWidget {
               amountStyle: _montserrat(
                 13,
                 weight: FontWeight.w600,
-                color: _kRewardGold,
+                color: AppColors.goldDark,
               ),
             ),
 
@@ -511,21 +515,25 @@ class _OrderSummary extends StatelessWidget {
               amountStyle: _montserrat(
                 13,
                 weight: FontWeight.w500,
-                color: _kRewardGold,
+                color: AppColors.goldDark,
               ),
             ),
 
-          Divider(height: 18, color: Colors.white.withValues(alpha: 0.3)),
+          Divider(height: 18, color: AppColors.tint(0.3)),
 
           // Total
           Row(
             children: [
-              Expanded(child: Text('Total', style: _calSans(22))),
+              Expanded(
+                child: Text('Total', style: _calSans(22, color: AppColors.fg)),
+              ),
               Text(
                 isAllFree ? 'FREE' : formatRupiah(cart.total),
                 style: _calSans(
                   22,
-                ).copyWith(color: isAllFree ? _kRewardGold : Colors.white),
+                ).copyWith(
+                  color: isAllFree ? AppColors.goldDark : AppColors.fg,
+                ),
               ),
             ],
           ),

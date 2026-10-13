@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../../core/i18n/app_lang.dart';
 
 /// One line of a past booking, from `booking_items` + its `treatment_snapshot`.
 class OrderSummaryItem extends Equatable {
@@ -80,7 +81,7 @@ class OrderSummary extends Equatable {
       ? '$firstTreatmentName +$additionalCount'
       : firstTreatmentName;
 
-  String get statusLabel => switch (status) {
+  String get statusLabel => tr(switch (status) {
     'pending' => 'Pending',
     'accepted' => 'Accepted',
     'confirmed' => 'Confirmed',
@@ -95,7 +96,7 @@ class OrderSummary extends Equatable {
       status.isEmpty
           ? ''
           : status[0].toUpperCase() + status.substring(1).replaceAll('_', ' '),
-  };
+  });
 
   @override
   List<Object?> get props => [

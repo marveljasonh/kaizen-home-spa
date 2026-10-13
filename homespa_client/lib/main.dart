@@ -3,10 +3,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
 import 'core/api/auth_session.dart';
 import 'core/services/notification_service.dart';
+import 'core/storage/app_prefs.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -16,6 +18,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Saved appearance / language (defaults: dark, English) + locale data.
+  await AppPrefs.init();
+  await initializeDateFormatting();
 
   // Push is best-effort: on iOS, Firebase throws until the iOS app is
   // registered (GoogleService-Info.plist) — the app must still launch.

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/i18n/app_lang.dart';
 
 enum BookingStatus { pending, confirmed, inProgress, completed, cancelled }
 
@@ -38,13 +39,13 @@ class BookingRecord extends Equatable {
       status == BookingStatus.confirmed ||
       status == BookingStatus.inProgress;
 
-  String get statusLabel => switch (status) {
+  String get statusLabel => tr(switch (status) {
     BookingStatus.pending => 'Pending',
     BookingStatus.confirmed => 'Confirmed',
     BookingStatus.inProgress => 'In Progress',
     BookingStatus.completed => 'Completed',
     BookingStatus.cancelled => 'Cancelled',
-  };
+  });
 
   String get displayTotal => formatRupiah(total);
 

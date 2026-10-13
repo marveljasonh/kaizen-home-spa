@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -79,10 +79,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Phone number is required';
+                          return tr('Phone number is required');
                         }
                         if (v.trim().replaceAll(RegExp(r'\D'), '').length < 8) {
-                          return 'Enter a valid phone number';
+                          return tr('Enter a valid phone number');
                         }
                         return null;
                       },
@@ -107,7 +107,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Password is required';
+                          return tr('Password is required');
                         }
                         return null;
                       },
@@ -115,7 +115,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () => context.push('/auth/forgot-password'),
                         child: Text(
                           'Forgot password?',
                           style: AppTypography.labelMedium.copyWith(
@@ -169,18 +169,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryLight,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.spa_outlined,
-            size: 40,
-            color: AppColors.primary,
-          ),
+        // The white lotus brand mark (same asset as the welcome screen).
+        Image.asset(
+          'assets/images/splash/logo_mark.png',
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
         ),
         const SizedBox(height: 20),
         Text(

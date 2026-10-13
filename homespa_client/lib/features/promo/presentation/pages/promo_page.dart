@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -80,11 +80,25 @@ const double _kPillHeight = 44;
 /// Point & Rewards content starts 25 below the hero.
 const double _kRewardsTop = 25;
 
-const Color _kPillOlive = AppColors.darkOliveLight; // #4E523B
-const Color _kGold = AppColors.gold;
-const Color _kMuted = AppColors.textOnDarkMuted;
-const Color _kActive = Color(0xFF74D38E);
-const Color _kExpired = Color(0xFFFF7B6E);
+// Mode-aware colours (getters, so never usable in `const` expressions).
+Color get _kPillOlive => AppColors.darkOliveLight; // #4E523B in both modes
+Color get _kGold => AppColors.gold;
+
+/// Gold used as ink (icons/text) on a card: darker on the light surface.
+Color get _kGoldInk => AppColors.isDark ? AppColors.gold : AppColors.goldDark;
+Color get _kMuted => AppColors.fgMuted;
+Color get _kActive => AppColors.success;
+Color get _kExpired => AppColors.danger;
+
+/// Error ink for the promo-code field.
+Color get _kErrorInk =>
+    AppColors.isDark ? const Color(0xFFFFB4A8) : const Color(0xFFD32F2F);
+
+/// Glass card fill / hairline: white 10% / 15% in dark, white card in light.
+Color get _kGlassFill =>
+    AppColors.isDark ? AppColors.tint(0.10) : AppColors.card;
+Color get _kGlassBorder =>
+    AppColors.isDark ? AppColors.tint(0.15) : AppColors.border;
 
 class PromoPage extends ConsumerStatefulWidget {
   const PromoPage({super.key});
@@ -176,9 +190,9 @@ class _PromoPageState extends ConsumerState<PromoPage>
     });
 
     try {
-      final result = await ref
-          .read(validateVoucherUseCaseProvider)
-          .call(code);
+      // Platform promo codes are validated server-side; the voucher itself
+      // is applied on the voucher step during booking.
+      final result = await ref.read(validateVoucherUseCaseProvider).call(code);
 
       if (!mounted) return;
 
@@ -196,8 +210,11 @@ class _PromoPageState extends ConsumerState<PromoPage>
             _isApplying = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Promo code is valid — apply it at checkout!'),
+            SnackBar(
+              content: Text(
+                'Promo code is valid — apply it at checkout!',
+                style: TextStyle(color: AppColors.btnText),
+              ),
               backgroundColor: AppColors.primary,
             ),
           );
@@ -218,8 +235,11 @@ class _PromoPageState extends ConsumerState<PromoPage>
     _tabController.animateTo(0);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Reward added to My Rewards!'),
+        SnackBar(
+          content: Text(
+            'Reward added to My Rewards!',
+            style: TextStyle(color: AppColors.btnText),
+          ),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -301,7 +321,7 @@ class _PromoPageState extends ConsumerState<PromoPage>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: AppColors.darkOlive, // #434930
+        backgroundColor: AppColors.page, // dark #434930
         // Layered hero (as on History): each tab's list scrolls under the
         // hero, and the hero moves up with the list that is showing.
         body: Stack(
@@ -565,13 +585,17 @@ class _PointsRewardsTab extends ConsumerStatefulWidget {
 class _PointsRewardsTabState extends ConsumerState<_PointsRewardsTab> {
   Future<void> _redeemReward(Map<String, dynamic> reward) async {
     try {
-      // Platform deducts the points atomically (fails on low balance).
+      // Platform redemption is atomic: balance check, deduction and the
+      // redemption row happen server-side.
       await redeemReward(reward['id'] as String);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Redemption failed: $e'),
+          content: Text(
+            'Redemption failed: $e',
+            style: const TextStyle(color: Colors.white),
+          ),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -792,7 +816,9 @@ class _TabPill extends StatelessWidget {
       selected: active,
       button: true,
       child: Material(
-        color: active ? Colors.white : AppColors.darkOliveLight,
+        color: active
+            ? AppColors.btnFill
+            : (AppColors.isDark ? AppColors.darkOliveLight : AppColors.card),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_kButtonRadius),
         ),
@@ -814,7 +840,7 @@ class _TabPill extends StatelessWidget {
                   style: GoogleFonts.montserrat(
                     fontSize: 17,
                     fontWeight: FontWeight.w400,
-                    color: active ? AppColors.darkOliveLight : Colors.white,
+                    color: active ? AppColors.btnText : AppColors.fg,
                     height: _kTabLabelHeight / 17,
                   ).copyWith(leadingDistribution: TextLeadingDistribution.even),
                 ),
@@ -844,7 +870,7 @@ class _SearchField extends StatelessWidget {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(_kButtonRadius),
       borderSide: BorderSide(
-        color: Colors.white.withValues(alpha: 0.5),
+        color: AppColors.tint(0.5),
         width: 0.5,
       ),
     );
@@ -858,30 +884,30 @@ class _SearchField extends StatelessWidget {
       child: SizedBox(
         height: _kSearchHeight,
         child: Material(
-          color: AppColors.darkOlive,
+          color: AppColors.page,
           borderRadius: BorderRadius.circular(_kButtonRadius),
           child: TextField(
             controller: controller,
             autofocus: true,
             onChanged: onChanged,
-            cursorColor: Colors.white,
+            cursorColor: AppColors.fg,
             textInputAction: TextInputAction.search,
-            style: GoogleFonts.montserrat(fontSize: 14, color: Colors.white),
+            style: GoogleFonts.montserrat(fontSize: 14, color: AppColors.fg),
             decoration: InputDecoration(
-              hintText: 'Search offers, voucher codes, rewards',
+              hintText: tr('Search offers, voucher codes, rewards'),
               hintStyle: GoogleFonts.montserrat(fontSize: 14, color: _kMuted),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.10),
+              fillColor: _kGlassFill,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               suffixIcon: IconButton(
-                tooltip: 'Close search',
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                tooltip: tr('Close search'),
+                icon: Icon(Icons.close_rounded, color: AppColors.fg),
                 onPressed: onClose,
               ),
               border: border,
               enabledBorder: border,
               focusedBorder: border.copyWith(
-                borderSide: const BorderSide(color: Colors.white),
+                borderSide: BorderSide(color: AppColors.fg),
               ),
             ),
           ),
@@ -904,7 +930,7 @@ class _FilterSheet extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Material(
-          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.10),
+          color: selected ? AppColors.btnFill : AppColors.tint(0.10),
           borderRadius: BorderRadius.circular(_kButtonRadius),
           child: InkWell(
             borderRadius: BorderRadius.circular(_kButtonRadius),
@@ -922,9 +948,7 @@ class _FilterSheet extends StatelessWidget {
                           style: flowBody(
                             15,
                             weight: FontWeight.w500,
-                            color: selected
-                                ? AppColors.darkOliveLight
-                                : Colors.white,
+                            color: selected ? AppColors.btnText : AppColors.fg,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -932,9 +956,7 @@ class _FilterSheet extends StatelessWidget {
                           subtitle,
                           style: flowBody(
                             12,
-                            color: selected
-                                ? AppColors.darkOliveLight
-                                : _kMuted,
+                            color: selected ? AppColors.btnText : _kMuted,
                             height: 1.35,
                           ),
                         ),
@@ -942,10 +964,7 @@ class _FilterSheet extends StatelessWidget {
                     ),
                   ),
                   if (selected)
-                    const Icon(
-                      Icons.check_rounded,
-                      color: AppColors.darkOliveLight,
-                    ),
+                    Icon(Icons.check_rounded, color: AppColors.btnText),
                 ],
               ),
             ),
@@ -955,9 +974,9 @@ class _FilterSheet extends StatelessWidget {
     }
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.darkOlive,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.header,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
         _kGutterLeft,
@@ -1001,8 +1020,8 @@ class _RefreshList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      color: AppColors.cream,
-      backgroundColor: AppColors.darkOlive,
+      color: AppColors.fg,
+      backgroundColor: AppColors.page,
       onRefresh: onRefresh,
       // Spinner appears under the hero, not behind it.
       edgeOffset: _kHeroHeight,
@@ -1047,10 +1066,10 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'CalSans',
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: AppColors.fg,
               fontSize: 23.741,
               letterSpacing: 0.2374,
               height: 32.54 / 23.741,
@@ -1059,7 +1078,7 @@ class _SectionHeader extends StatelessWidget {
           Text(
             subtitle,
             style: GoogleFonts.montserrat(
-              color: Colors.white,
+              color: AppColors.fg,
               fontSize: 10.898,
               fontWeight: FontWeight.w400,
               height: 1.219,
@@ -1085,9 +1104,9 @@ class _GlassCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: padding,
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.10),
+      color: _kGlassFill,
       borderRadius: BorderRadius.circular(_kCardRadius),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      border: Border.all(color: _kGlassBorder),
     ),
     child: child,
   );
@@ -1137,7 +1156,7 @@ class _CardSkeleton extends StatelessWidget {
     child: Container(
       height: 112,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: AppColors.tint(0.06),
         borderRadius: BorderRadius.circular(_kCardRadius),
       ),
     ),
@@ -1200,7 +1219,12 @@ class _PillButton extends StatelessWidget {
                 widthFactor: 1,
                 child: Text(
                   label,
-                  style: flowBody(15, weight: FontWeight.w500),
+                  // Olive fill in both modes: the label stays white.
+                  style: flowBody(
+                    15,
+                    weight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -1225,7 +1249,7 @@ class _IconTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(_kButtonRadius),
       border: Border.all(color: _kGold.withValues(alpha: 0.35), width: 0.5),
     ),
-    child: Icon(icon, size: 22, color: _kGold),
+    child: Icon(icon, size: 22, color: _kGoldInk),
   );
 }
 
@@ -1294,7 +1318,7 @@ class _RewardImage extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: AppColors.secondary),
+        ColoredBox(color: AppColors.secondary),
         if (url != null)
           CachedNetworkImage(
             imageUrl: url,
@@ -1348,31 +1372,31 @@ class _PromoCodeField extends StatelessWidget {
             controller: controller,
             textCapitalization: TextCapitalization.characters,
             onSubmitted: (_) => onSave(),
-            cursorColor: Colors.white,
+            cursorColor: AppColors.fg,
             style: flowBody(14).copyWith(letterSpacing: 0.8),
             decoration: InputDecoration(
-              hintText: 'Enter promo code',
+              hintText: tr('Enter promo code'),
               hintStyle: flowBody(14, color: _kMuted),
-              errorText: error,
-              errorStyle: flowBody(12, color: const Color(0xFFFFB4A8)),
+              errorText: error == null ? null : tr(error!),
+              errorStyle: flowBody(12, color: _kErrorInk),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.10),
+              fillColor: _kGlassFill,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 13,
               ),
-              border: border(Colors.white.withValues(alpha: 0.5)),
-              enabledBorder: border(Colors.white.withValues(alpha: 0.5)),
-              focusedBorder: border(Colors.white, 1),
-              errorBorder: border(const Color(0xFFFFB4A8)),
-              focusedErrorBorder: border(const Color(0xFFFFB4A8), 1),
+              border: border(AppColors.tint(0.5)),
+              enabledBorder: border(AppColors.tint(0.5)),
+              focusedBorder: border(AppColors.fg, 1),
+              errorBorder: border(_kErrorInk),
+              focusedErrorBorder: border(_kErrorInk, 1),
             ),
           ),
         ),
         const SizedBox(width: 10),
         isSaving
-            ? const SizedBox(
+            ? SizedBox(
                 width: 84,
                 height: _kPillHeight,
                 child: Center(
@@ -1380,7 +1404,7 @@ class _PromoCodeField extends StatelessWidget {
                     dimension: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: AppColors.fg,
                     ),
                   ),
                 ),
@@ -1417,7 +1441,7 @@ class _BannerList extends StatelessWidget {
           child: SizedBox(
             width: _kBannerWidth,
             child: loading
-                ? ColoredBox(color: Colors.white.withValues(alpha: 0.06))
+                ? ColoredBox(color: AppColors.tint(0.06))
                 : _BannerCard(banner: banners[i]),
           ),
         ),
@@ -1532,10 +1556,11 @@ String _compactRupiah(double value) {
   return 'Rp ${value.toStringAsFixed(0)}';
 }
 
-const Color _kAmber = Color(0xFFF5B942);
+Color get _kAmber =>
+    AppColors.isDark ? const Color(0xFFF5B942) : const Color(0xFFB7791F);
 
-/// Voucher info lines (min. purchase, validity): white 60%.
-const Color _kVoucherInfo = Color(0x99FFFFFF);
+/// Voucher info lines (min. purchase, validity): foreground at 60%.
+Color get _kVoucherInfo => AppColors.tint(0.6);
 
 /// Fixed so "Use" / "Used" / "Expired" never resize the bottom row.
 const double _kVoucherButtonWidth = 100;
@@ -1613,6 +1638,7 @@ class _VoucherCard extends StatelessWidget {
             split: split,
             radius: _kCardRadius,
             notch: _notch,
+            dark: AppColors.isDark,
           ),
           child: ClipPath(
             clipper: _TicketClipper(
@@ -1638,7 +1664,7 @@ class _VoucherCard extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.local_offer_outlined,
                             size: 18,
                             color: _kGold,
@@ -1773,30 +1799,29 @@ class _VoucherCard extends StatelessWidget {
 class _VoucherDetail extends StatelessWidget {
   final IconData icon;
   final String text;
-  final Color color;
-  const _VoucherDetail({
-    required this.icon,
-    required this.text,
-    this.color = _kVoucherInfo,
-  });
+  final Color? color;
+  const _VoucherDetail({required this.icon, required this.text, this.color});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(icon, size: 14, color: color),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(text, style: flowBody(12, color: color, height: 1.35)),
-        ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final c = color ?? _kVoucherInfo;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 14, color: c),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text, style: flowBody(12, color: c, height: 1.35)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// "#CODE"-style outlined pill with a copy icon; copies the code.
@@ -1808,7 +1833,7 @@ class _CopyCodePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Copy code $code',
+      label: tr('Copy code $code'),
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1824,9 +1849,14 @@ class _CopyCodePill extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: AppColors.isDark
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : AppColors.primaryLight,
               borderRadius: BorderRadius.circular(_kTagRadius),
-              border: Border.all(color: Colors.white, width: 0.3),
+              border: Border.all(
+                color: AppColors.isDark ? Colors.white : AppColors.tint(0.25),
+                width: 0.3,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1843,7 +1873,7 @@ class _CopyCodePill extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
+                Icon(Icons.copy_rounded, size: 14, color: AppColors.fg),
               ],
             ),
           ),
@@ -1891,10 +1921,14 @@ class _TicketPainter extends CustomPainter {
   final double split;
   final double radius;
   final double notch;
+
+  /// Appearance the painter was built for, so a mode switch repaints.
+  final bool dark;
   const _TicketPainter({
     required this.split,
     required this.radius,
     required this.notch,
+    required this.dark,
   });
 
   @override
@@ -1902,7 +1936,7 @@ class _TicketPainter extends CustomPainter {
     final shape = _ticketPath(size, split, radius, notch);
     canvas.drawPath(
       shape,
-      Paint()..color = Colors.white.withValues(alpha: 0.10),
+      Paint()..color = _kGlassFill,
     );
 
     canvas.save();
@@ -1923,12 +1957,12 @@ class _TicketPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: 0.15),
+        ..color = _kGlassBorder,
     );
 
     // Dashed divider, 4 clear of each notch.
     final dash = Paint()
-      ..color = Colors.white.withValues(alpha: 0.35)
+      ..color = AppColors.tint(0.35)
       ..strokeWidth = 1;
     const dashLength = 4.0;
     const gap = 3.0;
@@ -1946,7 +1980,10 @@ class _TicketPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TicketPainter old) =>
-      old.split != split || old.radius != radius || old.notch != notch;
+      old.split != split ||
+      old.radius != radius ||
+      old.notch != notch ||
+      old.dark != dark;
 }
 
 // ── My Rewards card ───────────────────────────────────────────────────────────
@@ -1988,7 +2025,7 @@ class _RedemptionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _rewardBenefit(reward),
-                    style: flowBody(13, color: Colors.white70, height: 1.3),
+                    style: flowBody(13, color: AppColors.fgMuted, height: 1.3),
                   ),
                   const SizedBox(height: 8),
                   _StatusPill(
@@ -2044,7 +2081,7 @@ class _PointsBalanceCard extends StatelessWidget {
                       ),
                       TextSpan(
                         text: '  pts',
-                        style: flowBody(14, color: Colors.white70),
+                        style: flowBody(14, color: AppColors.fgMuted),
                       ),
                     ],
                   ),
@@ -2086,9 +2123,9 @@ class _RewardCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: _kGlassFill,
         borderRadius: BorderRadius.all(radius),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        border: Border.all(color: _kGlassBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2113,7 +2150,8 @@ class _RewardCard extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: flowHeading(22, height: 1.15),
+                    // Over the reward photo: stays white in both modes.
+                    style: flowHeading(22, color: Colors.white, height: 1.15),
                   ),
                 ),
               ],
@@ -2154,7 +2192,7 @@ class _RewardCard extends StatelessWidget {
                           child: Container(
                             width: 4,
                             height: 4,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: _kGold,
                               shape: BoxShape.circle,
                             ),
@@ -2165,7 +2203,7 @@ class _RewardCard extends StatelessWidget {
                             line,
                             style: flowBody(
                               12.5,
-                              color: Colors.white70,
+                              color: AppColors.fgMuted,
                               height: 1.35,
                             ),
                           ),
@@ -2181,8 +2219,8 @@ class _RewardCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 4,
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
-                    valueColor: const AlwaysStoppedAnimation(_kGold),
+                    backgroundColor: AppColors.tint(0.15),
+                    valueColor: AlwaysStoppedAnimation(_kGoldInk),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -2228,7 +2266,7 @@ class _PointsPill extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded, size: 14, color: AppColors.secondary),
+        Icon(Icons.star_rounded, size: 14, color: AppColors.secondary),
         const SizedBox(width: 4),
         Text(
           '$points pts',
@@ -2257,12 +2295,12 @@ class _RedeemButton extends StatelessWidget {
       button: true,
       enabled: enabled,
       child: Material(
-        color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.06),
+        color: enabled ? AppColors.btnFill : AppColors.tint(0.06),
         shape: RoundedRectangleBorder(
           borderRadius: radius,
           side: enabled
               ? BorderSide.none
-              : BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              : BorderSide(color: AppColors.tint(0.15)),
         ),
         child: InkWell(
           borderRadius: radius,
@@ -2276,7 +2314,7 @@ class _RedeemButton extends StatelessWidget {
                 style: flowBody(
                   15,
                   weight: FontWeight.w500,
-                  color: enabled ? AppColors.darkOliveLight : _kMuted,
+                  color: enabled ? AppColors.btnText : _kMuted,
                 ),
               ),
             ),

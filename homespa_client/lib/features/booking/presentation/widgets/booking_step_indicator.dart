@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../core/theme/app_colors.dart';
 
 /// Booking progress for the dark #313129 flow header: white segments for
 /// done/current steps, white 20% for the rest, and "Step N of M".
@@ -27,7 +29,7 @@ class BookingStepIndicator extends StatelessWidget
           'Step $currentStep of $totalSteps',
           style: GoogleFonts.montserrat(
             fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.7),
+            color: AppColors.fgMuted,
           ),
         ),
         const SizedBox(height: 8),
@@ -39,9 +41,7 @@ class BookingStepIndicator extends StatelessWidget
                 height: 4,
                 margin: EdgeInsets.only(right: i < totalSteps - 1 ? 5 : 0),
                 decoration: BoxDecoration(
-                  color: filled
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.2),
+                  color: filled ? AppColors.fg : AppColors.tint(0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

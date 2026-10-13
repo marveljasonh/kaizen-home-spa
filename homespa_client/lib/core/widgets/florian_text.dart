@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../i18n/material_i18n.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Text in the Florian display font. The Florian demo font has no real "&"
@@ -25,7 +25,7 @@ class FlorianText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text.rich(
-      florianSpan(text, style),
+      florianSpan(tr(text), style),
       textAlign: textAlign,
       maxLines: maxLines,
       overflow: overflow,

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -45,8 +45,8 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: AppColors.darkOliveLight,
-            onPrimary: Colors.white,
+            primary: AppColors.btnFill,
+            onPrimary: AppColors.btnText,
           ),
         ),
         child: child!,
@@ -76,7 +76,7 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
     final labelStyle = GoogleFonts.montserrat(
       fontSize: 14,
       fontWeight: FontWeight.w500,
-      color: AppColors.textOnDark,
+      color: AppColors.fg,
     );
 
     return Container(
@@ -86,8 +86,8 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
         20,
         20 + MediaQuery.of(context).viewPadding.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.darkOlive,
+      decoration: BoxDecoration(
+        color: AppColors.page,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -99,7 +99,7 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: AppColors.tint(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -107,11 +107,11 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
           const SizedBox(height: 16),
           Text(
             'Filter Orders',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'CalSans',
               fontWeight: FontWeight.w600,
               fontSize: 22,
-              color: Colors.white,
+              color: AppColors.fg,
             ),
           ),
           const SizedBox(height: 16),
@@ -142,14 +142,14 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
           Text('Category', style: labelStyle),
           const SizedBox(height: 8),
           categoriesAsync.when(
-            loading: () => const Padding(
+            loading: () => Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.cream,
+                  color: AppColors.fg,
                 ),
               ),
             ),
@@ -157,7 +157,7 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
               'Couldn’t load categories.',
               style: GoogleFonts.montserrat(
                 fontSize: 13,
-                color: AppColors.textOnDarkMuted,
+                color: AppColors.fgMuted,
               ),
             ),
             data: (categories) => Wrap(
@@ -182,11 +182,9 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
                 child: OutlinedButton(
                   onPressed: _reset,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.fg,
                     minimumSize: const Size.fromHeight(48),
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
+                    side: BorderSide(color: AppColors.tint(0.5)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -199,8 +197,8 @@ class _OrderFilterSheetState extends ConsumerState<OrderFilterSheet> {
                 child: ElevatedButton(
                   onPressed: _apply,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.darkOliveLight,
+                    backgroundColor: AppColors.btnFill,
+                    foregroundColor: AppColors.btnText,
                     minimumSize: const Size.fromHeight(48),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -237,13 +235,10 @@ class _DateField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withValues(alpha: 0.10),
+      color: AppColors.isDark ? AppColors.glassFill : AppColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 0.5,
-        ),
+        side: BorderSide(color: AppColors.tint(0.5), width: 0.5),
       ),
       child: InkWell(
         onTap: onTap,
@@ -264,7 +259,7 @@ class _DateField extends StatelessWidget {
                       label,
                       style: GoogleFonts.montserrat(
                         fontSize: 11,
-                        color: AppColors.textOnDarkMuted,
+                        color: AppColors.fgMuted,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -276,7 +271,7 @@ class _DateField extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.montserrat(
                         fontSize: 14,
-                        color: Colors.white,
+                        color: AppColors.fg,
                       ),
                     ),
                   ],
@@ -284,22 +279,22 @@ class _DateField extends StatelessWidget {
               ),
               if (value != null)
                 IconButton(
-                  tooltip: 'Clear $label date',
+                  tooltip: tr('Clear $label date'),
                   visualDensity: VisualDensity.compact,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close_rounded,
                     size: 18,
-                    color: Colors.white,
+                    color: AppColors.fg,
                   ),
                   onPressed: onClear,
                 )
               else
-                const Padding(
-                  padding: EdgeInsets.only(right: 12),
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
                   child: Icon(
                     Icons.calendar_today_outlined,
                     size: 18,
-                    color: Colors.white,
+                    color: AppColors.fg,
                   ),
                 ),
             ],

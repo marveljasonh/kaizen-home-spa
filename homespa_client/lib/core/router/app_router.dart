@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import '../i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/app_preferences_providers.dart';
 import '../theme/app_colors.dart';
 import '../../features/promo/presentation/providers/rewards_provider.dart';
 
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
@@ -19,6 +21,7 @@ import '../../features/booking/presentation/pages/review_confirm_page.dart';
 import '../../features/booking/presentation/pages/schedule_page.dart';
 import '../../features/booking/presentation/pages/therapist_selection_page.dart';
 import '../../features/booking/presentation/pages/voucher_page.dart';
+import '../../features/contact/presentation/pages/contact_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/intake/presentation/pages/client_intake_page.dart';
 import '../../features/intake/presentation/providers/intake_providers.dart';
@@ -39,12 +42,29 @@ import '../../features/treatments/presentation/pages/treatments_page.dart';
 /// Shown while the router checks client_intake for the signed-in user.
 const String _kIntakeCheck = '/intake/check';
 
+/// Where the app was when the router was last rebuilt, so switching the
+/// theme or language (which recreates the router) returns to the same page.
+String? _resumeLocation;
+
+/// Routes that need `extra` data and so can't be re-opened from a bare URL.
+bool _canResume(String location) =>
+    !location.endsWith('/addons') && !location.endsWith('/addresses/add');
+
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Changing appearance or language rebuilds the whole page stack (const
+  // widgets would otherwise keep their old colours/text), so the router is
+  // recreated from these two providers.
+  ref.watch(themeModeProvider);
+  ref.watch(languageProvider);
+
   final notifier = _RouterNotifier(ref);
   ref.onDispose(notifier.dispose);
 
-  return GoRouter(
-    initialLocation: '/',
+  final resume = _resumeLocation;
+  final router = GoRouter(
+    // Guests land on Home and may browse (App Review 5.1.1(v)); a theme or
+    // language switch resumes wherever the user was.
+    initialLocation: resume != null && _canResume(resume) ? resume : '/',
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authNotifierProvider);
@@ -196,6 +216,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/auth/signup',
         builder: (context, state) => const SignUpPage(),
       ),
+      GoRoute(
+        path: '/auth/forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
+      ),
+
+      // ── Contact Us (WhatsApp numbers per branch; no bottom nav) ───────────
+      GoRoute(
+        path: '/contact',
+        builder: (context, state) => const ContactPage(),
+      ),
 
       // ── Main app shell with bottom navigation ─────────────────────────────
       StatefulShellRoute.indexedStack(
@@ -246,6 +276,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  void rememberLocation() {
+    _resumeLocation = router.routeInformationProvider.value.uri.toString();
+  }
+
+  router.routeInformationProvider.addListener(rememberLocation);
+  ref.onDispose(
+    () => router.routeInformationProvider.removeListener(rememberLocation),
+  );
+  return router;
 });
 
 // ── App shell ─────────────────────────────────────────────────────────────────
@@ -261,7 +301,7 @@ class _AppShell extends ConsumerWidget {
         .maybeWhen(data: (n) => n, orElse: () => 0);
 
     return Scaffold(
-      backgroundColor: AppColors.darkOlive,
+      backgroundColor: AppColors.page,
       body: navigationShell,
       bottomNavigationBar: _KaizenNavBar(
         currentIndex: navigationShell.currentIndex,
@@ -288,8 +328,8 @@ const List<String> _kNavIcons = [
 ];
 const int _kGiftIndex = 3;
 
-const Color _kNavActive = Colors.white;
-const Color _kNavInactive = Color(0xFFB2B2B2);
+Color get _kNavActive => AppColors.navActive;
+Color get _kNavInactive => AppColors.navInactive;
 const double _kNavIconSize = 24.326;
 const double _kNavHitPad = 12; // enlarges tap target without moving icons
 const double _kNavContentHeight = 56;
@@ -316,7 +356,12 @@ class _KaizenNavBar extends StatelessWidget {
 
     return Container(
       height: _kNavContentHeight + bottomArea,
-      color: AppColors.navBarDark,
+      decoration: BoxDecoration(
+        color: AppColors.navBg,
+        border: AppColors.isDark
+            ? null
+            : Border(top: BorderSide(color: AppColors.border)),
+      ),
       // First icon left 34.2, last right 35.0 (402 frame).
       padding: EdgeInsets.only(
         left: 34.2 - _kNavHitPad,

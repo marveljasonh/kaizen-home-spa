@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../core/i18n/app_lang.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../../../profile/data/address_repository.dart';
 import '../../../profile/domain/entities/saved_address.dart';
@@ -220,14 +222,15 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                     ),
 
                     // Fixed centre pin — stays still while map moves underneath
-                    const IgnorePointer(
+                    IgnorePointer(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.location_pin,
                             size: 52,
-                            color: kFlowHeaderColor,
+                            // Dark pin in both modes so it reads on the map tiles.
+                            color: AppColors.secondary,
                           ),
                           SizedBox(height: 24),
                         ],
@@ -241,16 +244,16 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                       child: FloatingActionButton.small(
                         onPressed: _isLocating ? null : _goToMyLocation,
                         backgroundColor: kFlowCardColor,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppColors.fg,
                         elevation: 4,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(kFlowRadius),
                           side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: AppColors.tint(0.5),
                             width: 0.5,
                           ),
                         ),
-                        tooltip: 'Use my location',
+                        tooltip: tr('Use my location'),
                         child: _isLocating
                             ? const SizedBox(
                                 width: 18,
@@ -346,7 +349,7 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                                                 Icon(
                                                   _savedAddressIcon(addr.label),
                                                   size: 12,
-                                                  color: Colors.white,
+                                                  color: AppColors.fg,
                                                 ),
                                                 const SizedBox(width: 5),
                                                 Flexible(
@@ -363,7 +366,7 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                                                 ),
                                                 if (addr.isDefault) ...[
                                                   const SizedBox(width: 4),
-                                                  const Icon(
+                                                  Icon(
                                                     Icons.star_rounded,
                                                     size: 11,
                                                     color: kFlowGold,
@@ -383,7 +386,7 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                                                 style: flowBody(
                                                   11,
                                                   color: isSelected
-                                                      ? Colors.white
+                                                      ? AppColors.fg
                                                       : kFlowMuted,
                                                 ),
                                                 maxLines: 2,
@@ -416,10 +419,10 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.location_on_rounded,
                           size: 20,
-                          color: Colors.white,
+                          color: AppColors.fg,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -440,14 +443,15 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                                     focusedBorder: InputBorder.none,
                                     contentPadding: EdgeInsets.zero,
                                     isCollapsed: true,
-                                    hintText:
-                                        'Move the map to set your location',
+                                    hintText: tr(
+                                      'Move the map to set your location',
+                                    ),
                                     hintStyle: flowBody(13, color: kFlowMuted),
                                   ),
                                 ),
                         ),
                         if (_isGeocoding)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.only(left: 8),
                             child: SizedBox(
                               width: 14,
@@ -468,8 +472,8 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                     controller: _buildingController,
                     textCapitalization: TextCapitalization.words,
                     style: flowBody(14),
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. The Residences Tower 1 (optional)',
+                    decoration: InputDecoration(
+                      hintText: tr('e.g. The Residences Tower 1 (optional)'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -478,8 +482,8 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                   TextField(
                     controller: _unitController,
                     style: flowBody(14),
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. Unit 12B, 3rd Floor (optional)',
+                    decoration: InputDecoration(
+                      hintText: tr('e.g. Unit 12B, 3rd Floor (optional)'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -489,8 +493,8 @@ class _LocationPageState extends ConsumerState<LocationPage> {
                     controller: _notesController,
                     maxLines: 2,
                     style: flowBody(14),
-                    decoration: const InputDecoration(
-                      hintText: 'Gate code, landmarks, instructions (optional)',
+                    decoration: InputDecoration(
+                      hintText: tr('Gate code, landmarks, instructions (optional)'),
                     ),
                   ),
                 ],

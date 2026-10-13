@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -187,9 +187,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 controller: _nameCtrl,
                 textCapitalization: TextCapitalization.words,
                 style: flowBody(15),
-                decoration: const InputDecoration(
-                  hintText: 'Your name',
-                  prefixIcon: Icon(Icons.person_outline_rounded),
+                decoration: InputDecoration(
+                  hintText: tr('Your name'),
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
                 ),
               ),
               const SizedBox(height: 20),
@@ -243,7 +243,7 @@ class _AvatarPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Change photo',
+      label: tr('Change photo'),
       child: GestureDetector(
         onTap: onTap,
         child: SizedBox.square(
@@ -263,14 +263,14 @@ class _AvatarPicker extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.btnFill,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.darkOlive, width: 2),
+                    border: Border.all(color: AppColors.page, width: 2),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.camera_alt_rounded,
                     size: 15,
-                    color: AppColors.darkOliveLight,
+                    color: AppColors.btnText,
                   ),
                 ),
               ),
@@ -303,10 +303,10 @@ class _ReadOnlyField extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: AppColors.tint(0.06),
             borderRadius: BorderRadius.circular(kFlowRadius),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: AppColors.tint(0.3),
               width: 0.5,
             ),
           ),
@@ -322,7 +322,7 @@ class _ReadOnlyField extends StatelessWidget {
                   style: flowBody(15, color: kFlowMuted),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.lock_outline_rounded,
                 size: 18,
                 color: kFlowMuted,

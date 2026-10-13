@@ -1,22 +1,31 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/treatments/presentation/widgets/glass_icon_button.dart';
+import '../i18n/material_i18n.dart';
 import '../theme/app_colors.dart';
 
-// Dark booking-flow design system (My Cart, Add-ons, booking steps):
+// Booking-flow design system (My Cart, Add-ons, booking steps). Dark (default):
 // #313129 header with 24px bottom corners, #434930 page with a faint radial
 // glow, CalSans headings, Montserrat body, olive cards and white primary
-// buttons. Material widgets inside [FlowScaffold] get a matching dark theme.
+// buttons. Light: white header, cream page, white cards, olive buttons.
+// Material widgets inside [FlowScaffold] get a matching theme. All colours
+// come from [AppColors], so they follow the selected mode (and therefore can't
+// be used in `const` expressions).
 
-const Color kFlowHeaderColor = AppColors.secondary; // #313129
-const Color kFlowPageColor = AppColors.darkOlive; // #434930
-const Color kFlowCardColor = AppColors.darkOliveLight; // #4E523B
-const Color kFlowAccent = Color(0xFF5B6240); // olive (Re-Order button)
-const Color kFlowGold = AppColors.gold;
-const Color kFlowMuted = AppColors.textOnDarkMuted;
+Color get kFlowHeaderColor => AppColors.header; // dark #313129
+Color get kFlowPageColor => AppColors.page; // dark #434930
+Color get kFlowCardColor => AppColors.card; // dark #4E523B
+Color get kFlowAccent => AppColors.isDark
+    ? const Color(0xFF5B6240) // olive (Re-Order button)
+    : AppColors.darkOliveLight;
+Color get kFlowGold => AppColors.gold;
+Color get kFlowMuted => AppColors.fgMuted;
+
+/// Border of a selected card / chip: white (dark) or olive (light).
+Color get kFlowSelectedBorder =>
+    AppColors.isDark ? Colors.white : AppColors.darkOliveLight;
 const double kFlowGutter = 20;
 const double kFlowRadius = 10;
 const double kFlowButtonHeight = 54;
@@ -26,108 +35,105 @@ const String _kIconBack = 'assets/icons/chevron_left_33.svg';
 TextStyle flowBody(
   double size, {
   FontWeight weight = FontWeight.w400,
-  Color color = Colors.white,
+  Color? color,
   double? height,
 }) => GoogleFonts.montserrat(
   fontSize: size,
   fontWeight: weight,
-  color: color,
+  color: color ?? AppColors.fg,
   height: height,
 );
 
 TextStyle flowHeading(
   double size, {
-  Color color = Colors.white,
+  Color? color,
   double? height,
 }) => TextStyle(
   fontFamily: 'CalSans',
   fontWeight: FontWeight.w600,
   fontSize: size,
-  color: color,
+  color: color ?? AppColors.fg,
   height: height,
 );
 
-/// Dark theme for stock Material widgets (text fields, radios, checkboxes,
-/// list tiles, dialogs' text) used inside the booking flow.
+/// Theme for stock Material widgets (text fields, radios, checkboxes, list
+/// tiles, dialogs' text) used inside the flow pages. Follows the active mode.
 ThemeData flowTheme(BuildContext context) {
   final base = Theme.of(context);
+  final dark = AppColors.isDark;
+  final fg = AppColors.fg;
   final scheme =
       ColorScheme.fromSeed(
         seedColor: kFlowAccent,
-        brightness: Brightness.dark,
+        brightness: dark ? Brightness.dark : Brightness.light,
       ).copyWith(
-        primary: Colors.white,
-        onPrimary: AppColors.darkOliveLight,
+        primary: AppColors.btnFill,
+        onPrimary: AppColors.btnText,
         secondary: kFlowAccent,
         onSecondary: Colors.white,
         surface: kFlowCardColor,
-        onSurface: Colors.white,
+        onSurface: fg,
         onSurfaceVariant: kFlowMuted,
-        outline: Colors.white.withValues(alpha: 0.5),
-        outlineVariant: Colors.white.withValues(alpha: 0.2),
-        error: const Color(0xFFFFB4A8),
+        outline: fg.withValues(alpha: 0.5),
+        outlineVariant: fg.withValues(alpha: 0.2),
+        error: dark ? const Color(0xFFFFB4A8) : const Color(0xFFD32F2F),
       );
   final fieldBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(kFlowRadius),
-    borderSide: BorderSide(
-      color: Colors.white.withValues(alpha: 0.5),
-      width: 0.5,
-    ),
+    borderSide: BorderSide(color: fg.withValues(alpha: 0.5), width: 0.5),
   );
   return base.copyWith(
     colorScheme: scheme,
     scaffoldBackgroundColor: kFlowPageColor,
     textTheme: GoogleFonts.montserratTextTheme(
       base.textTheme,
-    ).apply(bodyColor: Colors.white, displayColor: Colors.white),
-    iconTheme: const IconThemeData(color: Colors.white),
+    ).apply(bodyColor: fg, displayColor: fg),
+    iconTheme: IconThemeData(color: fg),
     dividerTheme: DividerThemeData(
-      color: Colors.white.withValues(alpha: 0.2),
+      color: fg.withValues(alpha: 0.2),
       thickness: 0.5,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.10),
+      fillColor: dark ? fg.withValues(alpha: 0.10) : Colors.white,
       hintStyle: flowBody(14, color: kFlowMuted),
       labelStyle: flowBody(14, color: kFlowMuted),
       floatingLabelStyle: flowBody(14),
-      prefixIconColor: Colors.white,
-      suffixIconColor: Colors.white,
+      prefixIconColor: fg,
+      suffixIconColor: fg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: fieldBorder,
       enabledBorder: fieldBorder,
-      focusedBorder: fieldBorder.copyWith(
-        borderSide: const BorderSide(color: Colors.white),
-      ),
+      focusedBorder: fieldBorder.copyWith(borderSide: BorderSide(color: fg)),
     ),
-    textSelectionTheme: const TextSelectionThemeData(cursorColor: Colors.white),
+    textSelectionTheme: TextSelectionThemeData(cursorColor: fg),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected) ? kFlowAccent : null,
       ),
       checkColor: const WidgetStatePropertyAll(Colors.white),
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.6)),
+      side: BorderSide(color: fg.withValues(alpha: 0.6)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
-            ? Colors.white
-            : Colors.white.withValues(alpha: 0.6),
+            ? (dark ? Colors.white : AppColors.darkOliveLight)
+            : fg.withValues(alpha: 0.6),
       ),
     ),
     listTileTheme: ListTileThemeData(
-      textColor: Colors.white,
-      iconColor: Colors.white,
+      textColor: fg,
+      iconColor: fg,
       titleTextStyle: flowBody(14, weight: FontWeight.w500),
       subtitleTextStyle: flowBody(12, color: kFlowMuted),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: Colors.white,
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: dark ? Colors.white : AppColors.darkOliveLight,
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: Colors.white,
+        foregroundColor: dark ? Colors.white : AppColors.darkOliveLight,
         textStyle: flowBody(13, weight: FontWeight.w500),
       ),
     ),
@@ -167,7 +173,9 @@ class FlowScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: AppColors.isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
       child: Theme(
         data: flowTheme(context),
         child: Scaffold(
@@ -210,20 +218,26 @@ class FlowBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
+    // Light mode: a barely-there olive wash instead of the dark glow/shade.
+    final dark = AppColors.isDark;
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: Alignment(0.9, -0.55),
+          center: const Alignment(0.9, -0.55),
           radius: 1.1,
-          colors: [Color(0x14FFFFFF), Color(0x00FFFFFF)], // 8% → 0
+          colors: dark
+              ? const [Color(0x14FFFFFF), Color(0x00FFFFFF)] // 8% → 0
+              : const [Color(0x0F4E523B), Color(0x004E523B)], // 6% → 0
         ),
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment(-1, 1),
+            center: const Alignment(-1, 1),
             radius: 1.2,
-            colors: [Color(0x26000000), Color(0x00000000)], // 15% → 0
+            colors: dark
+                ? const [Color(0x26000000), Color(0x00000000)] // 15% → 0
+                : const [Color(0x0A000000), Color(0x00000000)], // 4% → 0
           ),
         ),
       ),
@@ -253,17 +267,17 @@ class FlowHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: kFlowHeaderColor,
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x33000000),
+            color: AppColors.shadow,
             blurRadius: 14,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -283,6 +297,7 @@ class FlowHeader extends StatelessWidget {
                         iconSize: 33,
                         iconOffset: const Offset(6.5, 8.5),
                         fillAlpha: 0.10,
+                        adaptive: true,
                         onTap: onBack,
                       ),
                     const Spacer(),
@@ -347,11 +362,11 @@ class FlowCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       decoration: BoxDecoration(
-        color: selected ? kFlowAccent : kFlowCardColor,
+        color: selected ? AppColors.cardSelected : kFlowCardColor,
         borderRadius: radius,
         // Flat: solid fill + 1px border, no shadow.
         border: Border.all(
-          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.12),
+          color: selected ? kFlowSelectedBorder : AppColors.border,
           width: selected ? 1.2 : 1,
         ),
       ),
@@ -368,8 +383,12 @@ class FlowCard extends StatelessWidget {
 }
 
 /// Soft shadow for photo cards (My Cart) — flat FlowCards don't use it.
-const List<BoxShadow> kFlowCardShadow = [
-  BoxShadow(color: Color(0x2E000000), blurRadius: 12, offset: Offset(0, 4)),
+List<BoxShadow> get kFlowCardShadow => [
+  BoxShadow(
+    color: AppColors.isDark ? const Color(0x2E000000) : const Color(0x1A000000),
+    blurRadius: 12,
+    offset: const Offset(0, 4),
+  ),
 ];
 
 /// Uppercase-free section label (Montserrat Medium 14, 70% white).
@@ -387,7 +406,8 @@ class FlowSectionLabel extends StatelessWidget {
   );
 }
 
-/// White button, dark olive Montserrat 18 text (active History tab style).
+/// Primary button: white with olive text (dark mode) / olive with white text
+/// (light mode), Montserrat 18.
 class FlowPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -407,13 +427,14 @@ class FlowPrimaryButton extends StatelessWidget {
       label: label,
       onTap: enabled ? onTap : null,
       isLoading: isLoading,
-      fill: Colors.white.withValues(alpha: enabled || isLoading ? 1 : 0.35),
-      textColor: AppColors.darkOliveLight,
+      fill: AppColors.btnFill.withValues(alpha: enabled || isLoading ? 1 : 0.35),
+      textColor: AppColors.btnText,
     );
   }
 }
 
-/// Olive button with white text.
+/// Secondary button: olive fill with white text (dark) / pale olive fill with
+/// olive text (light).
 class FlowSecondaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -433,9 +454,10 @@ class FlowSecondaryButton extends StatelessWidget {
       label: label,
       onTap: enabled ? onTap : null,
       isLoading: isLoading,
-      fill: kFlowAccent.withValues(alpha: enabled || isLoading ? 1 : 0.5),
-      textColor: Colors.white,
-      border: Colors.white.withValues(alpha: 0.3),
+      fill: (AppColors.isDark ? kFlowAccent : AppColors.cardSelected)
+          .withValues(alpha: enabled || isLoading ? 1 : 0.5),
+      textColor: AppColors.isDark ? Colors.white : AppColors.darkOliveLight,
+      border: AppColors.tint(0.3),
     );
   }
 }
@@ -520,12 +542,9 @@ class FlowGlassPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? Colors.white : Colors.white.withValues(alpha: 0.10),
+      color: selected ? AppColors.btnFill : AppColors.glassFill,
       shape: StadiumBorder(
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 0.5,
-        ),
+        side: BorderSide(color: AppColors.tint(0.5), width: 0.5),
       ),
       child: InkWell(
         customBorder: const StadiumBorder(),
@@ -537,7 +556,7 @@ class FlowGlassPill extends StatelessWidget {
             style: flowBody(
               13,
               weight: selected ? FontWeight.w500 : FontWeight.w400,
-              color: selected ? AppColors.darkOliveLight : Colors.white,
+              color: selected ? AppColors.btnText : AppColors.fg,
             ),
           ),
         ),
@@ -562,7 +581,7 @@ class FlowCheckMark extends StatelessWidget {
         shape: BoxShape.circle,
         color: selected ? kFlowAccent : Colors.transparent,
         border: Border.all(
-          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+          color: selected ? kFlowSelectedBorder : AppColors.tint(0.6),
           width: 1.2,
         ),
       ),
