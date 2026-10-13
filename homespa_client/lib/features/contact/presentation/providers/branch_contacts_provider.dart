@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/api/api_client.dart';
 
 /// A branch and the WhatsApp number clients can reach it on.
 ///
-/// The data lives in `branches` (`phone`, `operating_hours`) and is edited by
-/// the admin in the dashboard (Branches page) — nothing is hard-coded here.
+/// The data is edited by the admin in the dashboard (Contact settings) and
+/// served by the platform — nothing is hard-coded here.
 class BranchContact {
   final String id;
   final String name;
@@ -39,7 +40,7 @@ class BranchContact {
       name: clean(row['name']) ?? 'Kaizen Home Spa',
       address: clean(row['address']),
       phone: clean(row['phone']) ?? '',
-      operatingHours: clean(row['operating_hours']),
+      operatingHours: clean(row['operatingHours'] ?? row['operating_hours']),
     );
   }
 }
@@ -76,18 +77,13 @@ final branchContactsProvider = FutureProvider.autoDispose<List<BranchContact>>((
   ref,
 ) async {
   try {
-    final rows = await Supabase.instance.client
-        .from('branches')
-        .select()
-        .eq('is_active', true)
-        .order('name', ascending: true);
-
+    final json = await apiClient.get('/content/contacts') as Map<String, dynamic>;
     return [
-      for (final row in rows as List<dynamic>)
-        BranchContact.fromRow(Map<String, dynamic>.from(row as Map)),
+      for (final row in (json['contacts'] as List).cast<Map<String, dynamic>>())
+        BranchContact.fromRow(row),
     ].where((b) => b.whatsappNumber.isNotEmpty).toList();
   } catch (e) {
-    debugPrint('[Contact] branches ERROR: $e');
+    debugPrint('[Contact] contacts ERROR: $e');
     rethrow;
   }
 });

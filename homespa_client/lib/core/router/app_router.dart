@@ -21,7 +21,6 @@ import '../../features/booking/presentation/pages/review_confirm_page.dart';
 import '../../features/booking/presentation/pages/schedule_page.dart';
 import '../../features/booking/presentation/pages/therapist_selection_page.dart';
 import '../../features/booking/presentation/pages/voucher_page.dart';
-import '../../features/chat/presentation/pages/chat_page.dart';
 import '../../features/contact/presentation/pages/contact_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/intake/presentation/pages/client_intake_page.dart';
@@ -63,9 +62,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   final resume = _resumeLocation;
   final router = GoRouter(
-    initialLocation: resume != null && _canResume(resume)
-        ? resume
-        : '/auth/login',
+    // Guests land on Home and may browse (App Review 5.1.1(v)); a theme or
+    // language switch resumes wherever the user was.
+    initialLocation: resume != null && _canResume(resume) ? resume : '/',
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authNotifierProvider);
@@ -73,7 +72,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final isAuthRoute = location.startsWith('/auth');
 
-      if (!isAuthenticated) return isAuthRoute ? null : '/auth/login';
+      if (!isAuthenticated) {
+        // Guests may browse freely (App Review 5.1.1(v)); account-based
+        // surfaces (booking flow, bookings, profile, intake) require login.
+        const guestPrefixes = ['/treatments', '/search', '/promo'];
+        final isGuestOk = location == '/' ||
+            guestPrefixes.any(
+              (p) => location == p || location.startsWith('$p/'),
+            );
+        return (isAuthRoute || isGuestOk) ? null : '/auth/login';
+      }
 
       // A brand-new account sees the welcome screen first; its Get Started
       // clears the flag and opens the intake form. Checked before the intake
@@ -139,13 +147,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // `extra`: the SavedAddress to edit; none adds a new one.
         builder: (context, state) =>
             AddAddressPage(address: state.extra as SavedAddress?),
-      ),
-
-      // ── In-app chat with the booking's therapist (no bottom nav) ─────────
-      GoRoute(
-        path: '/chat/:bookingId',
-        builder: (context, state) =>
-            ChatPage(bookingId: state.pathParameters['bookingId']!),
       ),
 
       // ── Booking detail ────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
 import '../../../../core/errors/failures.dart';
 import '../../domain/entities/addon.dart';
 import '../../domain/entities/treatment.dart';
@@ -16,7 +16,7 @@ class TreatmentsRepositoryImpl implements TreatmentsRepository {
   Future<Either<Failure, List<TreatmentCategory>>> getCategories() async {
     try {
       return Right(await _dataSource.getCategories());
-    } on PostgrestException catch (e) {
+    } on ApiException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -32,7 +32,7 @@ class TreatmentsRepositoryImpl implements TreatmentsRepository {
       return Right(
         await _dataSource.getTreatments(categoryId: categoryId, query: query),
       );
-    } on PostgrestException catch (e) {
+    } on ApiException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -43,7 +43,7 @@ class TreatmentsRepositoryImpl implements TreatmentsRepository {
   Future<Either<Failure, Treatment>> getTreatmentDetail(String id) async {
     try {
       return Right(await _dataSource.getTreatmentDetail(id));
-    } on PostgrestException catch (e) {
+    } on ApiException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -54,7 +54,7 @@ class TreatmentsRepositoryImpl implements TreatmentsRepository {
   Future<Either<Failure, List<Addon>>> getAddons() async {
     try {
       return Right(await _dataSource.getAddons());
-    } on PostgrestException catch (e) {
+    } on ApiException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));

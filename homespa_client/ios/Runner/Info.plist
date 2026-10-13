@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Homespa Client</string>
+	<string>Kaizen Home Spa</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,12 +24,16 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Digunakan untuk mengirim foto di chat booking Anda. / Used to send photos in your booking chat.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Digunakan untuk menemukan alamat Anda saat memesan layanan ke rumah. / Used to locate your address when booking a home service.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Digunakan untuk menemukan alamat Anda saat memesan layanan ke rumah. / Used to locate your address when booking a home service.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Digunakan untuk memilih foto yang dikirim di chat booking Anda. / Used to choose photos to send in your booking chat.</string>
+	<string>Digunakan untuk memilih foto profil Anda. / Used to choose your profile photo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -53,6 +57,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

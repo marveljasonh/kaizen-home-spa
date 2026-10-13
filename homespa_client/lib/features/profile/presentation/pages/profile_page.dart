@@ -1,9 +1,12 @@
+import 'dart:io' show Platform;
+
 import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/content/content_providers.dart';
 import '../../../../core/providers/app_preferences_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -105,19 +108,6 @@ class ProfilePage extends ConsumerWidget {
           _MenuCard(
             rows: [
               _MenuRow(
-                icon: themeMode == ThemeMode.dark
-                    ? Icons.dark_mode_outlined
-                    : Icons.light_mode_outlined,
-                title: 'Dark Mode',
-                trailing: _Switch(
-                  value: themeMode == ThemeMode.dark,
-                  onChanged: (val) =>
-                      ref.read(themeModeProvider.notifier).state = val
-                      ? ThemeMode.dark
-                      : ThemeMode.light,
-                ),
-              ),
-              _MenuRow(
                 icon: Icons.language_outlined,
                 title: 'Language',
                 subtitle: language == 'en' ? 'English' : 'Bahasa Indonesia',
@@ -148,25 +138,43 @@ class ProfilePage extends ConsumerWidget {
               _MenuRow(
                 icon: Icons.help_outline_rounded,
                 title: 'Help Center',
-                onTap: () => _showFaqSheet(context),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'help',
+                  fallbackTitle: 'Help Center',
+                  fallback: null, // built-in FAQ sheet
+                ),
               ),
               _MenuRow(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy Policy',
-                onTap: () =>
-                    _showTextSheet(context, 'Privacy Policy', _kPrivacyText),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'privacy',
+                  fallbackTitle: 'Privacy Policy',
+                  fallback: _kPrivacyText,
+                ),
               ),
               _MenuRow(
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
-                onTap: () =>
-                    _showTextSheet(context, 'Terms & Conditions', _kTermsText),
+                onTap: () => _openEditablePage(
+                  context,
+                  ref,
+                  key: 'terms',
+                  fallbackTitle: 'Terms & Conditions',
+                  fallback: _kTermsText,
+                ),
               ),
               _MenuRow(
                 icon: Icons.star_outline_rounded,
                 title: 'Rate the App',
                 onTap: () => _launchUrl(
-                  'https://play.google.com/store/apps/details?id=com.homespa.client',
+                  Platform.isIOS
+                      ? 'https://apps.apple.com/app/id6817308705?action=write-review'
+                      : 'https://play.google.com/store/apps/details?id=com.kaizenspa.app',
                 ),
               ),
             ],
@@ -267,6 +275,29 @@ class ProfilePage extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// Opens a support page: dashboard-saved content when present, otherwise
+  /// the built-in copy (null fallback = the FAQ sheet for Help Center).
+  Future<void> _openEditablePage(
+    BuildContext context,
+    WidgetRef ref, {
+    required String key,
+    required String fallbackTitle,
+    required String? fallback,
+  }) async {
+    ContentPage? page;
+    try {
+      page = await ref.read(contentPageProvider(key).future);
+    } catch (_) {}
+    if (!context.mounted) return;
+    if (page != null && page.hasBody) {
+      _showTextSheet(context, page.title ?? fallbackTitle, page.body!);
+    } else if (fallback != null) {
+      _showTextSheet(context, fallbackTitle, fallback);
+    } else {
+      _showFaqSheet(context);
+    }
   }
 
   void _showFaqSheet(BuildContext context) {
@@ -390,7 +421,7 @@ class _ProfileHeroRow extends StatelessWidget {
       children: [
         KaizenAvatar(
           url: user.avatarUrl,
-          initials: kaizenInitials(user.name, user.email),
+          initials: kaizenInitials(user.name, user.email ?? ''),
           size: _kAvatarSize,
         ),
         const SizedBox(width: 16),
@@ -400,14 +431,14 @@ class _ProfileHeroRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                (user.name?.trim().isNotEmpty ?? false) ? user.name! : 'Guest',
+                user.name.trim().isNotEmpty ? user.name : 'Guest',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: flowHeading(22, color: Colors.white, height: 1.2),
               ),
               const SizedBox(height: 2),
               Text(
-                user.email,
+                (user.email?.isNotEmpty ?? false) ? user.email! : user.phone,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: flowBody(12.5, color: Colors.white70, height: 1.35),
@@ -734,7 +765,7 @@ How We Use Your Information
 Your information is used to process bookings, communicate service updates, and improve our platform. We do not sell your personal data to third parties.
 
 Data Security
-We use industry-standard encryption and Supabase's secure infrastructure to protect your data. Access is restricted to authorized personnel only.
+We use industry-standard encryption and secure cloud infrastructure to protect your data. Access is restricted to authorized personnel only.
 
 Your Rights
 You may request access, correction, or deletion of your personal data at any time by contacting us at privacy@kaizenhomaspa.com.

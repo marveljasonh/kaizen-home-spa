@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/api/api_client.dart';
 
 import '../../data/datasources/treatments_remote_datasource.dart';
 import '../../data/repositories/treatments_repository_impl.dart';
@@ -15,7 +15,7 @@ import '../../domain/usecases/get_treatments_usecase.dart';
 // ── DI chain ──────────────────────────────────────────────────────────────────
 
 final _treatmentsDataSourceProvider = Provider<TreatmentsRemoteDataSource>(
-  (ref) => TreatmentsRemoteDataSourceImpl(Supabase.instance.client),
+  (ref) => TreatmentsRemoteDataSourceImpl(apiClient),
 );
 
 final treatmentsRepositoryProvider = Provider<TreatmentsRepository>(

@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
+import '../../../../core/content/content_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/intake_providers.dart';
@@ -93,6 +95,13 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   bool _avoidYes = false;
   final _avoidCtrl = TextEditingController();
 
+  // Dashboard-defined questions (App Content → Intake Form). Null = the
+  // built-in form above; loaded once before the first question renders.
+  bool _formLoaded = false;
+  List<IntakeQuestion>? _dynamicQs;
+  final Map<String, dynamic> _answers = {};
+  final Map<String, TextEditingController> _textCtrls = {};
+
   @override
   void initState() {
     super.initState();
@@ -111,20 +120,64 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
         _avoidCtrl.text = avoid;
       }
     }
+    ref
+        .read(intakeFormProvider.future)
+        .then((qs) {
+          if (!mounted) return;
+          setState(() {
+            _dynamicQs = qs.isEmpty ? null : qs;
+            final savedAnswers = saved?.answers;
+            for (final q in _dynamicQs ?? const <IntakeQuestion>[]) {
+              if (savedAnswers != null && savedAnswers.containsKey(q.id)) {
+                _answers[q.id] = savedAnswers[q.id];
+              }
+              if (q.type == 'text') {
+                _textCtrls[q.id] = TextEditingController(
+                  text: (_answers[q.id] as String?) ?? '',
+                );
+              }
+            }
+            _formLoaded = true;
+          });
+        })
+        .catchError((Object e) {
+          debugPrint('[Intake] form definition fetch failed: $e');
+          if (mounted) setState(() => _formLoaded = true);
+        });
   }
 
   @override
   void dispose() {
     _avoidCtrl.dispose();
+    for (final c in _textCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  bool get _isLast => _step == _kQuestionCount - 1;
+  int get _questionCount => _dynamicQs?.length ?? _kQuestionCount;
 
-  /// Only "Yes (Insert Body Area)" needs input; everything else can be left
-  /// as "none / no preference".
-  bool get _canContinue =>
-      !_isSaving && !(_isLast && _avoidYes && _avoidCtrl.text.trim().isEmpty);
+  bool get _isLast => _step == _questionCount - 1;
+
+  bool _dynamicAnswered(IntakeQuestion q) {
+    final a = q.type == 'text' ? _textCtrls[q.id]?.text.trim() : _answers[q.id];
+    if (a == null) return false;
+    if (a is List) return a.isNotEmpty;
+    if (a is String) return a.trim().isNotEmpty;
+    return true;
+  }
+
+  /// Built-in form: only "Yes (Insert Body Area)" needs input. Editable
+  /// form: required questions must be answered before continuing.
+  bool get _canContinue {
+    if (_isSaving) return false;
+    final qs = _dynamicQs;
+    if (qs != null) {
+      final q = qs[_step];
+      return !q.required || _dynamicAnswered(q);
+    }
+    return !(_isLast && _avoidYes && _avoidCtrl.text.trim().isEmpty);
+  }
 
   void _back() {
     if (_step > 0) {
@@ -158,52 +211,45 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   }
 
   Future<void> _save() async {
-    final client = Supabase.instance.client;
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) {
+    final customerId = AuthSession.current?.customerId;
+    if (customerId == null) {
       debugPrint('[Intake] save skipped: no signed-in user');
       _showSaveError();
       return;
     }
 
-    // Matches public.client_intake (supabase/client_intake.sql).
-    final payload = <String, dynamic>{
-      'client_id': userId,
-      'health_conditions': _healthNone
-          ? <String>[]
-          : <String>[
-              for (final c in _kHealthConditions)
-                if (_health.contains(c)) c,
-            ],
-      'focus_areas': <String>[
-        for (final a in _kFocusAreas)
-          if (_focus.contains(a)) a,
-      ],
-      'pressure': _kPressures.any((p) => p.$1 == _pressure)
-          ? _pressure
-          : 'medium',
-      'avoid_areas': _avoidYes && _avoidCtrl.text.trim().isNotEmpty
-          ? _avoidCtrl.text.trim()
-          : null,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    };
-
     setState(() => _isSaving = true);
-    debugPrint(
-      '[Intake] upsert (${widget.editMode ? 'edit' : 'first time'}): $payload',
-    );
     try {
-      await client
-          .from('client_intake')
-          .upsert(payload, onConflict: 'client_id');
-    } on PostgrestException catch (e, st) {
-      debugPrint(
-        '[Intake] save failed: PostgrestException code=${e.code} '
-        'message=${e.message} details=${e.details} hint=${e.hint}',
+      final qs = _dynamicQs;
+      if (qs != null) {
+        for (final q in qs.where((q) => q.type == 'text')) {
+          final t = _textCtrls[q.id]?.text.trim() ?? '';
+          if (t.isNotEmpty) {
+            _answers[q.id] = t;
+          } else {
+            _answers.remove(q.id);
+          }
+        }
+      }
+      await apiClient.put(
+        '/customers/$customerId/intake',
+        body: qs != null
+            ? {'answers': _answers}
+            : {
+                'healthConditions': _healthNone
+                    ? <String>[]
+                    : [
+                        for (final c in _kHealthConditions)
+                          if (_health.contains(c)) c,
+                      ],
+                'focusAreas': [
+                  for (final a in _kFocusAreas)
+                    if (_focus.contains(a)) a,
+                ],
+                'pressure': _pressure,
+                'avoidAreas': _avoidYes ? _avoidCtrl.text.trim() : null,
+              },
       );
-      debugPrint('$st');
-      _showSaveError();
-      return;
     } catch (e, st) {
       debugPrint('[Intake] save failed: ${e.runtimeType}: $e');
       debugPrint('$st');
@@ -269,19 +315,22 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
               children: [
                 _Header(
                   step: _step,
+                  total: _questionCount,
                   showBack: _step > 0 || widget.editMode,
                   onBack: _back,
                 ),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      _kGutter,
-                      32,
-                      _kGutter,
-                      24,
-                    ),
-                    child: _buildQuestion(),
-                  ),
+                  child: !_formLoaded
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(
+                            _kGutter,
+                            32,
+                            _kGutter,
+                            24,
+                          ),
+                          child: _buildQuestion(),
+                        ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(_kGutter, 8, _kGutter, 16),
@@ -304,6 +353,8 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
   }
 
   Widget _buildQuestion() {
+    final qs = _dynamicQs;
+    if (qs != null) return _buildDynamicQuestion(qs[_step]);
     return switch (_step) {
       0 => _Question(
         title: 'I have indications of the following health conditions.',
@@ -393,6 +444,86 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
       ),
     };
   }
+
+  Widget _buildDynamicQuestion(IntakeQuestion q) {
+    switch (q.type) {
+      case 'multi':
+        final selected =
+            ((_answers[q.id] as List?) ?? const []).cast<String>().toSet();
+        return _Question(
+          title: q.label,
+          subtitle: null,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final o in q.options)
+                _Chip(
+                  label: o,
+                  selected: selected.contains(o),
+                  onTap: () => setState(() {
+                    final next = selected.toSet();
+                    if (!next.remove(o)) next.add(o);
+                    _answers[q.id] = next.toList();
+                  }),
+                ),
+            ],
+          ),
+        );
+      case 'single':
+        final value = _answers[q.id] as String?;
+        return _Question(
+          title: q.label,
+          subtitle: null,
+          child: Column(
+            children: [
+              for (final o in q.options) ...[
+                _OptionPill(
+                  label: o,
+                  selected: value == o,
+                  onTap: () => setState(() => _answers[q.id] = o),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        );
+      case 'boolean':
+        final value = _answers[q.id] as bool?;
+        return _Question(
+          title: q.label,
+          subtitle: null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _OptionPill(
+                label: 'Yes',
+                selected: value == true,
+                onTap: () => setState(() => _answers[q.id] = true),
+              ),
+              const SizedBox(height: 12),
+              _OptionPill(
+                label: 'No',
+                selected: value == false,
+                onTap: () => setState(() => _answers[q.id] = false),
+              ),
+            ],
+          ),
+        );
+      default: // text
+        return _Question(
+          title: q.label,
+          subtitle: null,
+          child: _AvoidField(
+            controller: _textCtrls.putIfAbsent(
+              q.id,
+              () => TextEditingController(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        );
+    }
+  }
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -400,11 +531,13 @@ class _ClientIntakePageState extends ConsumerState<ClientIntakePage> {
 /// "Client Intake Form" + "Question N of 4", then a thin progress bar.
 class _Header extends StatelessWidget {
   final int step;
+  final int total;
   final bool showBack;
   final VoidCallback onBack;
 
   const _Header({
     required this.step,
+    required this.total,
     required this.showBack,
     required this.onBack,
   });
@@ -443,7 +576,7 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Question ${step + 1} of $_kQuestionCount',
+                  'Question ${step + 1} of $total',
                   style: _body(13, color: _kMuted),
                 ),
               ],
@@ -455,7 +588,7 @@ class _Header extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(2),
               child: TweenAnimationBuilder<double>(
-                tween: Tween(end: (step + 1) / _kQuestionCount),
+                tween: Tween(end: (step + 1) / total),
                 duration: const Duration(milliseconds: 250),
                 builder: (_, value, _) => LinearProgressIndicator(
                   value: value,
@@ -476,7 +609,7 @@ class _Header extends StatelessWidget {
 
 class _Question extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final Widget child;
 
   const _Question({
@@ -500,8 +633,10 @@ class _Question extends StatelessWidget {
             color: _kInk,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(subtitle, style: _body(13, color: _kMuted, height: 1.4)),
+        if (subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(subtitle!, style: _body(13, color: _kMuted, height: 1.4)),
+        ],
         const SizedBox(height: 28),
         child,
       ],

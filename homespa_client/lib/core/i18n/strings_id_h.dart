@@ -68,7 +68,7 @@ How We Use Your Information
 Your information is used to process bookings, communicate service updates, and improve our platform. We do not sell your personal data to third parties.
 
 Data Security
-We use industry-standard encryption and Supabase's secure infrastructure to protect your data. Access is restricted to authorized personnel only.
+We use industry-standard encryption and secure cloud infrastructure to protect your data. Access is restricted to authorized personnel only.
 
 Your Rights
 You may request access, correction, or deletion of your personal data at any time by contacting us at privacy@kaizenhomaspa.com.
@@ -86,7 +86,7 @@ Cara Kami Menggunakan Informasi Anda
 Informasi Anda digunakan untuk memproses pemesanan, menyampaikan pembaruan layanan, dan meningkatkan platform kami. Kami tidak menjual data pribadi Anda kepada pihak ketiga.
 
 Keamanan Data
-Kami menggunakan enkripsi standar industri dan infrastruktur aman Supabase untuk melindungi data Anda. Akses dibatasi hanya untuk personel yang berwenang.
+Kami menggunakan enkripsi standar industri dan infrastruktur cloud yang aman untuk melindungi data Anda. Akses dibatasi hanya untuk personel yang berwenang.
 
 Hak Anda
 Anda dapat meminta akses, perbaikan, atau penghapusan data pribadi Anda kapan saja dengan menghubungi kami di privacy@kaizenhomaspa.com.
