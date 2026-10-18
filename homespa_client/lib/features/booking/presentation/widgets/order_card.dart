@@ -538,17 +538,22 @@ class OrderEmptyState extends StatelessWidget {
                     child: InkWell(
                       customBorder: const StadiumBorder(),
                       onTap: () => context.go('/treatments'),
-                      child: SizedBox(
-                        width: 142,
-                        height: 38.036,
-                        child: Center(
-                          child: Text(
-                            'Explore Treatments',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 11.17,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white,
-                            ),
+                      child: Padding(
+                        // Sizes to the text (142×38 at the design's 1.0 text
+                        // scale) so a larger system font can't clip the label.
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 11,
+                        ),
+                        child: Text(
+                          'Explore Treatments',
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.fade,
+                          style: GoogleFonts.montserrat(
+                            fontSize: 11.17,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white,
                           ),
                         ),
                       ),

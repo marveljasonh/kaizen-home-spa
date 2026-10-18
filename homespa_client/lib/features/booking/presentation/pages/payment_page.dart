@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/booking_request.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
+import '../providers/order_history_providers.dart';
 import '../widgets/booking_step_indicator.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
@@ -120,6 +121,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       },
       (bookingId) {
         ref.read(bookingCartProvider.notifier).clearCart();
+        // The new booking must show in Home "Recent Orders" and the History
+        // tab without a manual pull-to-refresh.
+        ref.invalidate(orderHistoryProvider);
         setState(() => _successBookingId = bookingId);
       },
     );

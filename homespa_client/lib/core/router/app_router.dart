@@ -17,6 +17,7 @@ import '../../features/booking/presentation/pages/booking_detail_page.dart';
 import '../../features/booking/presentation/pages/bookings_page.dart';
 import '../../features/booking/presentation/pages/location_page.dart';
 import '../../features/booking/presentation/pages/payment_page.dart';
+import '../../features/booking/presentation/providers/order_history_providers.dart';
 import '../../features/booking/presentation/pages/review_confirm_page.dart';
 import '../../features/booking/presentation/pages/schedule_page.dart';
 import '../../features/booking/presentation/pages/therapist_selection_page.dart';
@@ -306,10 +307,18 @@ class _AppShell extends ConsumerWidget {
       bottomNavigationBar: _KaizenNavBar(
         currentIndex: navigationShell.currentIndex,
         giftBadgeCount: unclaimedCount,
-        onTap: (index) => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        ),
+        onTap: (index) {
+          // Home (0) and History (2) both render order history — refetch on
+          // entry so a booking made elsewhere shows without pull-to-refresh.
+          if (index != navigationShell.currentIndex &&
+              (index == 0 || index == 2)) {
+            ref.invalidate(orderHistoryProvider);
+          }
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
       ),
     );
   }
