@@ -12,7 +12,9 @@ import '../../../../core/utils/timezone_helper.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
+import '../providers/branch_providers.dart';
 import '../widgets/booking_step_indicator.dart';
+import '../widgets/branch_selector_sheet.dart';
 
 // ── Booking window (all times WIB) ────────────────────────────────────────────
 
@@ -209,7 +211,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SummaryBanner(selectedWib: _selectedWib),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            const BranchPickerRow(),
+            const SizedBox(height: 16),
             _buildPicker(),
             if (_packageIdOf(cart) != null) ...[
               const SizedBox(height: 16),
@@ -245,7 +249,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
         '${day.month.toString().padLeft(2, '0')}-'
         '${day.day.toString().padLeft(2, '0')}';
     final slotsAsync = ref.watch(
-      availabilityProvider((packageId: packageId, date: dateStr)),
+      availabilityProvider((
+        packageId: packageId,
+        date: dateStr,
+        branchId: ref.watch(selectedBranchIdProvider),
+      )),
     );
     return slotsAsync.when(
       loading: () => _Availability.checking,

@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/booking_cart.dart';
+import '../widgets/branch_selector_sheet.dart';
 
 // My Cart on the booking-flow shell (FlowScaffold: #313129 header, #434930
 // page): photo cards under the order-card overlay, a glass summary panel and
@@ -84,8 +85,8 @@ class _BookingCartPageState extends ConsumerState<BookingCartPage> {
 
     // Total rows in the list: free reward card (0 or 1) + regular items + order summary
     final freeOffset = cart.isFree ? 1 : 0;
-    final listItemCount =
-        freeOffset + cart.items.length + 1; // +1 = order summary
+    // +1 branch picker at the top, +1 order summary at the bottom.
+    final listItemCount = 1 + freeOffset + cart.items.length + 1;
 
     return FlowScaffold(
       subtitle: 'Your',
@@ -118,7 +119,10 @@ class _BookingCartPageState extends ConsumerState<BookingCartPage> {
               ),
               itemCount: listItemCount,
               separatorBuilder: (_, __) => const SizedBox(height: _kCardGap),
-              itemBuilder: (context, index) {
+              itemBuilder: (context, rawIndex) {
+                // Index 0 → where the booking happens ("Choose Your Branch").
+                if (rawIndex == 0) return const BranchPickerRow();
+                final index = rawIndex - 1;
                 final totalItems = freeOffset + cart.items.length;
 
                 // Last index → order summary

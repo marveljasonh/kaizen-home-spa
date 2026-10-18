@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/booking_request.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
+import '../providers/branch_providers.dart';
 import '../providers/order_history_providers.dart';
 import '../widgets/booking_step_indicator.dart';
 
@@ -68,6 +69,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       treatmentDurationId: cart.selectedDuration?.id,
       therapistId: cart.therapist?.id,
       scheduledAt: scheduledAt,
+      branchId: ref.read(selectedBranchIdProvider),
       addressId: cart.address!.id,
       addressText: cart.address!.fullAddress,
       latitude: cart.address!.latitude,

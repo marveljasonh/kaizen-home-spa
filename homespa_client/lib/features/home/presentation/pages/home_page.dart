@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../booking/presentation/providers/branch_providers.dart';
+import '../../../booking/presentation/widgets/branch_selector_sheet.dart';
 import '../../../booking/presentation/widgets/order_card.dart';
 import '../../domain/entities/treatment_preview.dart';
 import '../providers/home_providers.dart';
@@ -54,7 +56,9 @@ class HomePage extends ConsumerWidget {
             children: [
               // Hero is edge-to-edge and runs under the status bar.
               _HeroSection(),
-              SizedBox(height: 20), // hero ends 295 → title 315
+              SizedBox(height: 14),
+              _BranchChip(),
+              SizedBox(height: 14),
               _SectionTitle(
                 title: 'Popular Treatment',
                 subtitle:
@@ -645,4 +649,70 @@ class _EmptyPadding extends StatelessWidget {
     padding: const EdgeInsets.only(left: _kGutterLeft, right: _kGutterRight),
     child: child,
   );
+}
+
+// ── Branch chip ───────────────────────────────────────────────────────────────
+
+/// Shows the customer's chosen branch (or "nearest, auto") and opens the
+/// "Choose Your Branch" sheet. The choice is used for availability and the
+/// booking itself.
+class _BranchChip extends ConsumerWidget {
+  const _BranchChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branch = ref.watch(selectedBranchProvider);
+    final label = branch?.name ?? 'Nearest branch';
+
+    return Padding(
+      padding: const EdgeInsets.only(left: _kGutterLeft, right: _kGutterRight),
+      child: Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => showBranchSelectorSheet(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: AppColors.fg,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Branch',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.fgMuted,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fg,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                  color: AppColors.fgMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

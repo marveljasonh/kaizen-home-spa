@@ -52,13 +52,17 @@ final therapistsProvider = FutureProvider.autoDispose<List<Therapist>>((
 /// Free slots for a package on a WIB calendar day, from the platform's slot
 /// engine (shared with the WhatsApp bot — a listed slot is genuinely free).
 final availabilityProvider = FutureProvider.autoDispose
-    .family<List<AvailabilitySlot>, ({String packageId, String date})>((
-      ref,
-      args,
-    ) async {
+    .family<
+      List<AvailabilitySlot>,
+      ({String packageId, String date, String? branchId})
+    >((ref, args) async {
       return ref
           .read(bookingDataSourceProvider)
-          .getAvailability(packageId: args.packageId, date: args.date);
+          .getAvailability(
+            packageId: args.packageId,
+            date: args.date,
+            branchId: args.branchId,
+          );
     });
 
 final getBookingHistoryUseCaseProvider = Provider<GetBookingHistoryUseCase>(

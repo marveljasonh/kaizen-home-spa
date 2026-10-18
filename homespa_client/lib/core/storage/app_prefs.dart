@@ -13,6 +13,7 @@ class AppPrefs {
   static const _kTheme = 'pref_theme_mode';
   static const _kLang = 'pref_language';
   static const _kNotif = 'pref_notifications';
+  static const _kBranch = 'pref_branch_id';
 
   static Future<void> init() async {
     try {
@@ -47,5 +48,19 @@ class AppPrefs {
 
   static void saveNotifications(bool on) {
     _prefs?.setBool(_kNotif, on);
+  }
+
+  /// Chosen branch id, or null for "nearest branch (auto)".
+  static String? get branchId {
+    final v = _prefs?.getString(_kBranch);
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  static void saveBranchId(String? id) {
+    if (id == null) {
+      _prefs?.remove(_kBranch);
+    } else {
+      _prefs?.setString(_kBranch, id);
+    }
   }
 }

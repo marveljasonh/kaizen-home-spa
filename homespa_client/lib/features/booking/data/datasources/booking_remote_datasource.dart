@@ -20,6 +20,7 @@ abstract interface class BookingRemoteDataSource {
     required String date, // YYYY-MM-DD (WIB calendar day)
     double? lat,
     double? lng,
+    String? branchId, // explicit "Choose Your Branch" pick; null = nearest
   });
   Future<BookingDetailData> getBookingDetail(String bookingId);
   Future<void> submitReview(
@@ -184,10 +185,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
           (created['address'] as Map<String, dynamic>)['id'] as String;
     }
 
-    final branchId = await _resolveBranchId(
-      lat: request.latitude,
-      lng: request.longitude,
-    );
+    final branchId =
+        request.branchId ??
+        await _resolveBranchId(lat: request.latitude, lng: request.longitude);
 
     final addonIds = request.addons.map((a) => a.addonId).toSet().toList();
     final redemptionId = request.freeRewardId ?? request.rewardRedemptionId;
@@ -284,8 +284,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     required String date,
     double? lat,
     double? lng,
+    String? branchId,
   }) async {
-    final branchId = await _resolveBranchId(lat: lat, lng: lng);
+    branchId ??= await _resolveBranchId(lat: lat, lng: lng);
     final json =
         await _api.get(
               '/availability',

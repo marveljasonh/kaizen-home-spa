@@ -45,6 +45,10 @@ class BookingRequest {
   final String? therapistId;
   final DateTime scheduledAt;
 
+  /// Explicitly chosen branch ("Choose Your Branch"); when null the platform
+  /// uses the branch nearest to the booking address.
+  final String? branchId;
+
   /// Saved platform address id; when null the address is created from
   /// [addressText] + coordinates at booking time.
   final String? addressId;
@@ -69,6 +73,7 @@ class BookingRequest {
     this.treatmentDurationId,
     this.therapistId,
     required this.scheduledAt,
+    this.branchId,
     this.addressId,
     required this.addressText,
     required this.latitude,
