@@ -15,6 +15,14 @@ const String _kCategoriesBg = 'assets/images/treatments/categories_bg.png';
 
 // ── Figma layout values (402pt-wide frame) ───────────────────────────────────
 const double _kGutter = 30;
+const double _kHeaderTop = 77;
+const double _kHeaderHeight = 49;
+const double _kHeaderGap = 33; // 159 − (77 + 49)
+const double _kCardGap = 26.84;
+const double _kBottomPad = 26.16; // with the trailing card gap: 53 above navbar
+const double _kCardDesignHeight = 170.439;
+// Below this the title/subtitle get hard to read — fall back to scrolling.
+const double _kCardMinHeight = 112;
 
 /// Card order and Indonesian subtitles from the design. Categories not listed
 /// here are appended after these, without a subtitle.
@@ -24,10 +32,10 @@ const Map<String, String> _kCategorySubtitles = {
   'Nail Care': 'Treatment Kuku',
 };
 
-/// Figma: Florian Regular, underlined.
-TextStyle _categoryTitleStyle() => const TextStyle(
+/// Figma: Florian Regular, underlined. [scale] shrinks it with the card.
+TextStyle _categoryTitleStyle(double scale) => TextStyle(
   fontFamily: 'Florian',
-  fontSize: 50.709,
+  fontSize: 50.709 * scale,
   fontWeight: FontWeight.w400,
   color: Colors.white,
   height: 40.04 / 50.709,
@@ -134,36 +142,71 @@ class _CategorySelectionView extends ConsumerWidget {
           color: AppColors.fg,
           backgroundColor: AppColors.card,
           onRefresh: () async => ref.invalidate(categoriesProvider),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            // Header top is 77 from the screen top; last card ends 53 above
-            // the nav bar (26.84 of that comes from the trailing card gap).
-            padding: const EdgeInsets.fromLTRB(_kGutter, 77, _kGutter, 26.16),
-            children: [
-              const _CategoryHeader(),
-              const SizedBox(height: 33), // 159 − (77 + 49)
-              ...categoriesAsync
-                  .when(
-                    loading: () =>
-                        List.generate(3, (i) => const _CategoryCard.skeleton()),
-                    error: (_, __) => [
-                      _CategoryError(
-                        onRetry: () => ref.invalidate(categoriesProvider),
-                      ),
-                    ],
-                    data: (categories) => [
-                      for (final c in _sortForDesign(categories))
-                        _CategoryCard(
-                          title: c.name,
-                          subtitle: _kCategorySubtitles[c.name],
-                          onTap: () => ref
-                              .read(selectedCategoryIdProvider.notifier)
-                              .select(c.id),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Shrink cards so all categories fit the viewport (down to a
+              // readable minimum, past which the list scrolls again).
+              double cardHeight(int count) {
+                final available =
+                    constraints.maxHeight -
+                    _kHeaderTop -
+                    _kHeaderHeight -
+                    _kHeaderGap -
+                    _kBottomPad -
+                    _kCardGap * count; // trailing gap after every card
+                return (available / count).clamp(
+                  _kCardMinHeight,
+                  _kCardDesignHeight,
+                );
+              }
+
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                // Header top is 77 from the screen top; last card ends 53
+                // above the nav bar (26.84 of that is the trailing card gap).
+                padding: const EdgeInsets.fromLTRB(
+                  _kGutter,
+                  _kHeaderTop,
+                  _kGutter,
+                  _kBottomPad,
+                ),
+                children: [
+                  const _CategoryHeader(),
+                  const SizedBox(height: _kHeaderGap),
+                  ...categoriesAsync
+                      .when(
+                        loading: () => List.generate(
+                          3,
+                          (i) =>
+                              _CategoryCard.skeleton(height: cardHeight(3)),
                         ),
-                    ],
-                  )
-                  .expand((card) => [card, const SizedBox(height: 26.84)]),
-            ],
+                        error: (_, __) => [
+                          _CategoryError(
+                            onRetry: () => ref.invalidate(categoriesProvider),
+                          ),
+                        ],
+                        data: (categories) {
+                          final sorted = _sortForDesign(categories);
+                          final height = cardHeight(sorted.length);
+                          return [
+                            for (final c in sorted)
+                              _CategoryCard(
+                                title: c.name,
+                                subtitle: _kCategorySubtitles[c.name],
+                                height: height,
+                                onTap: () => ref
+                                    .read(selectedCategoryIdProvider.notifier)
+                                    .select(c.id),
+                              ),
+                          ];
+                        },
+                      )
+                      .expand(
+                        (card) => [card, const SizedBox(height: _kCardGap)],
+                      ),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -226,25 +269,31 @@ class _CategoryHeader extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final String? title;
   final String? subtitle;
+  final double height;
   final VoidCallback? onTap;
 
   const _CategoryCard({
     required String this.title,
     required this.subtitle,
+    required this.height,
     required VoidCallback this.onTap,
   });
 
-  const _CategoryCard.skeleton() : title = null, subtitle = null, onTap = null;
+  const _CategoryCard.skeleton({required this.height})
+    : title = null,
+      subtitle = null,
+      onTap = null;
 
-  static const double _height = 170.439;
   static const double _border = 0.5;
 
   @override
   Widget build(BuildContext context) {
+    // Figma positions/type assume a 170.439pt card; scale with the height.
+    final scale = height / _kCardDesignHeight;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: _height,
+        height: height,
         decoration: BoxDecoration(
           color: const Color(0xBF353A30), // #353A30 @ 75%
           borderRadius: BorderRadius.circular(20),
@@ -258,7 +307,7 @@ class _CategoryCard extends StatelessWidget {
             : Stack(
                 children: [
                   Positioned(
-                    top: 52.22 - _border,
+                    top: 52.22 * scale - _border,
                     left: 16,
                     right: 16,
                     // Long category names shrink to fit rather than clip.
@@ -267,14 +316,14 @@ class _CategoryCard extends StatelessWidget {
                       child: FlorianText(
                         title!,
                         textAlign: TextAlign.center,
-                        style: _categoryTitleStyle(),
+                        style: _categoryTitleStyle(scale),
                         maxLines: 1,
                       ),
                     ),
                   ),
                   if (subtitle != null)
                     Positioned(
-                      top: 103.64 - _border,
+                      top: 103.64 * scale - _border,
                       left: 16,
                       right: 16,
                       child: Text(
@@ -284,7 +333,7 @@ class _CategoryCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style:
                             GoogleFonts.montserrat(
-                              fontSize: 16.324,
+                              fontSize: 16.324 * scale,
                               fontWeight: FontWeight.w300,
                               fontStyle: FontStyle.italic,
                               color: Colors.white,

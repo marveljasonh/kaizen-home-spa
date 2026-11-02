@@ -7,7 +7,6 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -163,9 +162,6 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
       );
       return;
     }
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-
     final notes = _notesCtrl.text.trim().isNotEmpty
         ? _notesCtrl.text.trim()
         : null;
@@ -176,19 +172,21 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
       if (_isEditing) {
         await repo.updateAddress(
           id: widget.address!.id,
-          userId: userId,
           label: _effectiveLabel,
           fullAddress: address,
           notes: notes,
           isDefault: _isDefault,
+          lat: _center.latitude,
+          lng: _center.longitude,
         );
       } else {
         await repo.addAddress(
-          userId: userId,
           label: _effectiveLabel,
           fullAddress: address,
           notes: notes,
           isDefault: _isDefault,
+          lat: _center.latitude,
+          lng: _center.longitude,
         );
       }
       if (mounted) context.pop();

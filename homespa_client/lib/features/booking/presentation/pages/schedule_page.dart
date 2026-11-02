@@ -12,7 +12,9 @@ import '../../../../core/utils/timezone_helper.dart';
 import '../../../../core/widgets/flow_widgets.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
+import '../providers/branch_providers.dart';
 import '../widgets/booking_step_indicator.dart';
+import '../widgets/branch_selector_sheet.dart';
 
 // ── Booking window (all times WIB) ────────────────────────────────────────────
 
@@ -30,9 +32,6 @@ const int _kDaysAhead = 30;
 
 /// Minute wheel step (00, 10, 20 …).
 const int _kMinuteStep = 10;
-
-/// Gap kept free between one of a therapist's bookings and the next.
-const int _kBufferMinutes = 30;
 
 // ── Wheel styling ─────────────────────────────────────────────────────────────
 
@@ -212,13 +211,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SummaryBanner(selectedWib: _selectedWib),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            const BranchPickerRow(),
+            const SizedBox(height: 16),
             _buildPicker(),
-            if (therapist != null) ...[
+            if (_packageIdOf(cart) != null) ...[
               const SizedBox(height: 16),
               _AvailabilityNote(
                 state: availability,
-                therapistName: therapist.name,
+                therapistName: therapist?.name ?? 'Your therapist',
               ),
             ],
           ],
@@ -231,35 +232,51 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  _Availability _checkAvailability(BookingCart cart) {
-    final therapistId = cart.therapist?.id;
-    if (therapistId == null) return _Availability.free;
+  /// The platform package being booked (a duration variant IS a package).
+  String? _packageIdOf(BookingCart cart) =>
+      cart.selectedDuration?.id ?? cart.freeRewardTreatmentId;
 
-    final windows = ref.watch(
-      therapistBusyWindowsProvider((
-        therapistId: therapistId,
-        dayWib: _dates[_dateIndex],
+  /// The chosen time is checked against GET /availability — the same slot
+  /// engine the WhatsApp bot uses, so the answer reflects every channel's
+  /// bookings. The database still rejects a snatched slot on commit (409).
+  _Availability _checkAvailability(BookingCart cart) {
+    final packageId = _packageIdOf(cart);
+    if (packageId == null) return _Availability.free;
+
+    final day = _dates[_dateIndex];
+    final dateStr =
+        '${day.year.toString().padLeft(4, '0')}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}';
+    final slotsAsync = ref.watch(
+      availabilityProvider((
+        packageId: packageId,
+        date: dateStr,
+        branchId: ref.watch(selectedBranchIdProvider),
       )),
     );
-    return windows.when(
+    return slotsAsync.when(
       loading: () => _Availability.checking,
       error: (e, _) {
-        debugPrint('Therapist availability check failed: $e');
+        debugPrint('Availability check failed: $e');
         return _Availability.unknown;
       },
-      data: (busy) {
-        final start = WIB.wibToUtc(_selectedWib);
-        final minutes = cart.totalDurationMinutes > 0
-            ? cart.totalDurationMinutes
-            : kDefaultBookingMinutes;
-        final end = start.add(Duration(minutes: minutes));
-        const buffer = Duration(minutes: _kBufferMinutes);
-        final clash = busy.any(
-          (b) =>
-              start.isBefore(b.endUtc.add(buffer)) &&
-              b.startUtc.isBefore(end.add(buffer)),
+      data: (slots) {
+        final therapistId = cart.therapist?.id;
+        final startUtc = WIB.wibToUtc(_selectedWib);
+        // Slots are proposed on the hour; the containing hour must be free.
+        final hourStartUtc = DateTime.utc(
+          startUtc.year,
+          startUtc.month,
+          startUtc.day,
+          startUtc.hour,
         );
-        return clash ? _Availability.conflict : _Availability.free;
+        final ok = slots.any(
+          (s) =>
+              (therapistId == null || s.therapistId == therapistId) &&
+              s.startUtc.isAtSameMomentAs(hourStartUtc),
+        );
+        return ok ? _Availability.free : _Availability.conflict;
       },
     );
   }

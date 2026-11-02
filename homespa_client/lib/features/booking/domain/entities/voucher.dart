@@ -10,8 +10,14 @@ class Voucher extends Equatable {
   final double discountValue;
   final double minPurchaseAmount;
   final String? description;
-
   final DateTime? expiresAt;
+
+  /// Platform promo codes grant a free add-on (e.g. KAIZENBARU = free 30-min
+  /// Body Massage) instead of cutting the bill. [discountValue] stays 0 so
+  /// cart math is untouched; the freebie is granted server-side on booking.
+  final String? freeAddonName;
+  final int? freeAddonDurationMinutes;
+  final double? freeAddonValueIdr;
 
   const Voucher({
     required this.code,
@@ -20,11 +26,24 @@ class Voucher extends Equatable {
     this.minPurchaseAmount = 0,
     this.description,
     this.expiresAt,
+    this.freeAddonName,
+    this.freeAddonDurationMinutes,
+    this.freeAddonValueIdr,
   });
 
-  String get displayDiscount => discountType == DiscountType.percentage
-      ? '${discountValue.toStringAsFixed(0)}% off'
-      : '${formatRupiah(discountValue)} off';
+  bool get grantsFreeAddon => freeAddonName != null;
+
+  String get displayDiscount {
+    if (grantsFreeAddon) {
+      final min = freeAddonDurationMinutes;
+      return min != null && min > 0
+          ? 'Free $freeAddonName ($min min)'
+          : 'Free $freeAddonName';
+    }
+    return discountType == DiscountType.percentage
+        ? '${discountValue.toStringAsFixed(0)}% off'
+        : '${formatRupiah(discountValue)} off';
+  }
 
   @override
   List<Object?> get props => [
@@ -32,5 +51,6 @@ class Voucher extends Equatable {
     discountType,
     discountValue,
     minPurchaseAmount,
+    freeAddonName,
   ];
 }

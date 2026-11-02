@@ -1,95 +1,98 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/api/auth_session.dart';
+import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/saved_address.dart';
 
 final addressRepositoryProvider = Provider<AddressRepository>(
-  (ref) => AddressRepository(Supabase.instance.client),
+  (ref) => AddressRepository(apiClient),
 );
 
 final savedAddressesProvider = FutureProvider<List<SavedAddress>>((ref) {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  if (userId == null) return Future.value([]);
-  return ref.watch(addressRepositoryProvider).getAddresses(userId);
+  ref.watch(authNotifierProvider); // re-run on sign-in / sign-out
+  if (AuthSession.current == null) return Future.value([]);
+  return ref.watch(addressRepositoryProvider).getAddresses();
 });
 
+/// Saved addresses on the platform: GET/POST /customers/{id}/addresses,
+/// PATCH/DELETE /customers/{id}/addresses/{addressId}.
 class AddressRepository {
-  final SupabaseClient _client;
-  const AddressRepository(this._client);
+  final ApiClient _api;
+  const AddressRepository(this._api);
 
-  Future<List<SavedAddress>> getAddresses(String userId) async {
-    final data = await _client
-        .from('saved_addresses')
-        .select()
-        .eq('client_id', userId)
-        .order('is_default', ascending: false)
-        .order('created_at', ascending: false);
-    return (data as List)
-        .map((e) => SavedAddress.fromJson(e as Map<String, dynamic>))
+  String get _base {
+    final session = AuthSession.current;
+    if (session == null) throw const ApiException('Not signed in', 401);
+    return '/customers/${session.customerId}/addresses';
+  }
+
+  /// The API wants a city; take the tail of a comma-separated address.
+  static String _cityOf(String fullAddress) {
+    final parts = fullAddress.split(',');
+    final tail = parts.length > 1 ? parts.last.trim() : '';
+    return tail.isNotEmpty ? tail : '-';
+  }
+
+  Future<List<SavedAddress>> getAddresses() async {
+    final json = await _api.get(_base) as Map<String, dynamic>;
+    return (json['addresses'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(SavedAddress.fromJson)
         .toList();
   }
 
   Future<void> addAddress({
-    required String userId,
     required String label,
     required String fullAddress,
     String? notes,
     bool isDefault = false,
+    double? lat,
+    double? lng,
   }) async {
-    if (isDefault) {
-      await _client
-          .from('saved_addresses')
-          .update({'is_default': false})
-          .eq('client_id', userId);
-    }
-    await _client.from('saved_addresses').insert({
-      'client_id': userId,
-      'label': label,
-      'full_address': fullAddress,
-      if (notes != null && notes.isNotEmpty) 'notes': notes,
-      'is_default': isDefault,
-    });
+    await _api.post(
+      _base,
+      body: {
+        'label': label,
+        'line': fullAddress,
+        'city': _cityOf(fullAddress),
+        // Jakarta fallback — dispatch needs some coordinate to route from.
+        'lat': lat ?? -6.2088,
+        'lng': lng ?? 106.8456,
+        if (notes != null && notes.isNotEmpty) 'entranceNotes': notes,
+        if (isDefault) 'isDefault': true,
+      },
+    );
   }
 
-  /// Updates an existing address. Making it the default clears the flag on
-  /// the client's other addresses first (as [addAddress] does).
   Future<void> updateAddress({
     required String id,
-    required String userId,
     required String label,
     required String fullAddress,
     String? notes,
     bool isDefault = false,
+    double? lat,
+    double? lng,
   }) async {
-    if (isDefault) {
-      await _client
-          .from('saved_addresses')
-          .update({'is_default': false})
-          .eq('client_id', userId);
-    }
-    await _client
-        .from('saved_addresses')
-        .update({
-          'label': label,
-          'full_address': fullAddress,
-          'notes': (notes != null && notes.isNotEmpty) ? notes : null,
-          'is_default': isDefault,
-        })
-        .eq('id', id);
+    await _api.patch(
+      '$_base/$id',
+      body: {
+        'label': label,
+        'line': fullAddress,
+        'city': _cityOf(fullAddress),
+        'entranceNotes': notes,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+        'isDefault': isDefault,
+      },
+    );
   }
 
   Future<void> deleteAddress(String id) async {
-    await _client.from('saved_addresses').delete().eq('id', id);
+    await _api.delete('$_base/$id');
   }
 
-  Future<void> setDefault(String id, String userId) async {
-    await _client
-        .from('saved_addresses')
-        .update({'is_default': false})
-        .eq('client_id', userId);
-    await _client
-        .from('saved_addresses')
-        .update({'is_default': true})
-        .eq('id', id);
+  Future<void> setDefault(String id) async {
+    await _api.patch('$_base/$id', body: {'isDefault': true});
   }
 }

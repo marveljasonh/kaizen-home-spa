@@ -9,18 +9,24 @@ class ClientIntake {
   /// Body areas to avoid; null means "No Preference".
   final String? avoidAreas;
 
+  /// Answers to dashboard-defined questions ({questionId: answer}), when the
+  /// form was filled against an editable definition.
+  final Map<String, dynamic>? answers;
+
   const ClientIntake({
     required this.healthConditions,
     required this.focusAreas,
     required this.pressure,
     this.avoidAreas,
+    this.answers,
   });
 
   factory ClientIntake.fromJson(Map<String, dynamic> json) => ClientIntake(
-    healthConditions: _strings(json['health_conditions']),
-    focusAreas: _strings(json['focus_areas']),
+    healthConditions: _strings(json['healthConditions']),
+    focusAreas: _strings(json['focusAreas']),
     pressure: json['pressure'] as String? ?? 'medium',
-    avoidAreas: json['avoid_areas'] as String?,
+    avoidAreas: json['avoidAreas'] as String?,
+    answers: json['answers'] as Map<String, dynamic>?,
   );
 
   static List<String> _strings(Object? value) =>

@@ -4,7 +4,9 @@ import '../../../../core/i18n/material_i18n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/auth_session.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/flow_widgets.dart';
@@ -26,10 +28,10 @@ class EditProfilePage extends ConsumerStatefulWidget {
 
 class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _emailCtrl;
   bool _isSaving = false;
-  XFile? _pickedImage;
   Uint8List? _pickedBytes;
+  String _pickedContentType = 'image/jpeg';
 
   /// 'male' / 'female' (as saved at sign-up); null until loaded or unset.
   String? _gender;
@@ -40,34 +42,17 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final authState = ref.read(authNotifierProvider);
     final user = authState is AuthAuthenticated ? authState.user : null;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
-    _phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    _loadGender();
+    _emailCtrl = TextEditingController(text: user?.email ?? '');
+    _gender = user?.gender;
+    // Make sure gender/email are fresh (they live on the server profile).
+    ref.read(authNotifierProvider.notifier).refreshUser();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
-  }
-
-  /// Gender isn't on AppUser, so read it from profiles.
-  Future<void> _loadGender() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-    try {
-      final row = await Supabase.instance.client
-          .from('profiles')
-          .select('gender')
-          .eq('id', userId)
-          .maybeSingle();
-      final gender = row?['gender'] as String?;
-      if (mounted && _gender == null && gender != null) {
-        setState(() => _gender = gender);
-      }
-    } catch (e) {
-      debugPrint('Load gender error: $e');
-    }
   }
 
   Future<void> _pickImage() async {
@@ -81,8 +66,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final bytes = await image.readAsBytes();
     if (mounted) {
       setState(() {
-        _pickedImage = image;
         _pickedBytes = bytes;
+        _pickedContentType = image.name.toLowerCase().endsWith('.png')
+            ? 'image/png'
+            : image.name.toLowerCase().endsWith('.webp')
+            ? 'image/webp'
+            : 'image/jpeg';
       });
     }
   }
@@ -95,73 +84,75 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       ).showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty ||
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A valid email is required')),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
-    try {
-      final client = Supabase.instance.client;
-      debugPrint('Current user: ${client.auth.currentUser?.id}');
-      debugPrint(
-        'Current session: ${client.auth.currentSession?.accessToken != null}',
-      );
-      String? avatarUrl;
 
-      if (_pickedImage != null) {
-        final bytes = await _pickedImage!.readAsBytes();
-        final path = 'avatars/${client.auth.currentUser!.id}.jpg';
-        await client.storage
-            .from('avatars')
-            .uploadBinary(
-              path,
-              bytes,
-              fileOptions: const FileOptions(
-                upsert: true,
-                contentType: 'image/jpeg',
-              ),
-            );
-        avatarUrl = client.storage.from('avatars').getPublicUrl(path);
+    // Upload the new photo first, so a failure surfaces before the pop.
+    final picked = _pickedBytes;
+    if (picked != null) {
+      final customerId = AuthSession.current?.customerId;
+      if (customerId != null) {
+        try {
+          await apiClient.postBytes(
+            '/customers/$customerId/avatar',
+            bytes: picked,
+            contentType: _pickedContentType,
+          );
+        } on ApiException catch (e) {
+          if (!mounted) return;
+          setState(() => _isSaving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo upload failed: ${e.message}')),
+          );
+          return;
+        }
       }
+    }
 
-      final userId = client.auth.currentUser!.id;
-      debugPrint('Saving profile for user: $userId');
-      try {
-        final response = await client
-            .from('profiles')
-            .update({
-              'full_name': name,
-              'phone': _phoneCtrl.text.trim(),
-              if (_gender != null) 'gender': _gender,
-              if (avatarUrl != null) 'avatar_url': avatarUrl,
-            })
-            .eq('id', userId);
-        debugPrint('Update response: $response');
-      } catch (e) {
-        debugPrint('Update error: $e');
-        rethrow;
-      }
-
-      await ref.read(authNotifierProvider.notifier).refreshUser();
-
-      if (mounted) {
+    final result = await ref
+        .read(authRepositoryProvider)
+        .updateProfile(name: name, email: email, gender: _gender);
+    await ref.read(authNotifierProvider.notifier).refreshUser();
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    result.fold(
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: ${failure.message}')),
+      ),
+      (_) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Profile updated')));
         context.pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final user = authState is AuthAuthenticated ? authState.user : null;
+
+    // The profile refresh may land after initState — pick up gender/email once.
+    ref.listen(authNotifierProvider, (_, next) {
+      if (next is AuthAuthenticated) {
+        if (_gender == null && next.user.gender != null) {
+          setState(() => _gender = next.user.gender);
+        }
+        if (_emailCtrl.text.isEmpty && (next.user.email?.isNotEmpty ?? false)) {
+          _emailCtrl.text = next.user.email!;
+        }
+      }
+    });
+
     return KaizenHeroPage(
       label: 'Account',
       title: 'Edit Profile',
@@ -202,14 +193,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              const FlowSectionLabel('Phone Number'),
+              const FlowSectionLabel('Email'),
               TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
                 style: flowBody(15),
                 decoration: const InputDecoration(
-                  hintText: '+62 812 3456 7890',
-                  prefixIcon: Icon(Icons.phone_outlined),
+                  hintText: 'you@example.com',
+                  prefixIcon: Icon(Icons.email_outlined),
                 ),
               ),
               const SizedBox(height: 20),
@@ -220,11 +211,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 onSelected: (g) => setState(() => _gender = g),
               ),
               const SizedBox(height: 20),
-              const FlowSectionLabel('Email'),
+              const FlowSectionLabel('Phone Number'),
               _ReadOnlyField(
-                icon: Icons.email_outlined,
-                value: user?.email ?? '',
-                helper: 'Email cannot be changed',
+                icon: Icons.phone_outlined,
+                value: user?.phone ?? '',
+                helper: 'Phone number is your login and cannot be changed',
               ),
             ],
           ),

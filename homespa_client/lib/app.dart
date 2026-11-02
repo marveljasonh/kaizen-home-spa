@@ -64,12 +64,25 @@ class App extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: isDark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        // The UI is positioned to the Figma design, which breaks when the
+        // system font size is set very large (text collides with absolutely
+        // positioned siblings). Honor accessibility scaling up to 1.2×.
+        final media = MediaQuery.of(context);
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: isDark
+              ? SystemUiOverlayStyle.light
+              : SystemUiOverlayStyle.dark,
+          child: MediaQuery(
+            data: media.copyWith(
+              textScaler: TextScaler.linear(
+                media.textScaler.scale(1).clamp(1.0, 1.2),
+              ),
+            ),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       routerConfig: router,
     );
   }

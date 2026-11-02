@@ -183,8 +183,8 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = category?.name ?? '';
-    final description = _kCategoryDescriptions[name];
+    final name = category?.header ?? category?.name ?? '';
+    final description = category?.subheader ?? _kCategoryDescriptions[category?.name ?? ''];
     // Keep centred titles clear of the 49px buttons on either side.
     const titleInset = 30 + GlassIconButton.size + 8;
 

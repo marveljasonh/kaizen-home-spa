@@ -9,9 +9,16 @@ class SignUpUseCase {
   const SignUpUseCase(this._repository);
 
   Future<Either<Failure, AppUser>> call({
+    required String name,
+    required String phone,
     required String email,
     required String password,
-    required String name,
-  }) =>
-      _repository.signUpWithEmail(email: email, password: password, name: name);
+    String? referralCode,
+  }) => _repository.signUp(
+    name: name,
+    phone: phone,
+    email: email,
+    password: password,
+    referralCode: referralCode,
+  );
 }

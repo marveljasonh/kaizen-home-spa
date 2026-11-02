@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/api/auth_session.dart';
 import 'core/services/notification_service.dart';
 import 'core/storage/app_prefs.dart';
 
@@ -23,18 +23,24 @@ Future<void> main() async {
   await AppPrefs.init();
   await initializeDateFormatting();
 
+  // Push is best-effort: on iOS, Firebase throws until the iOS app is
+  // registered (GoogleService-Info.plist) — the app must still launch.
+  var firebaseReady = false;
   if (!kIsWeb) {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+      firebaseReady = true;
+    } catch (e) {
+      debugPrint('Firebase unavailable, push disabled: $e');
+    }
   }
 
-  await Supabase.initialize(
-    url: 'https://zxiofkulrvjtpusgzoei.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4aW9ma3VscnZqdHB1c2d6b2VpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNjQ3ODAsImV4cCI6MjA5Njc0MDc4MH0.7-0OQtBE_Uf3eGIiMYN_baqugLHqwEK0aqIC5uH7cJ0',
-  );
+  await AuthSession.load();
 
-  if (!kIsWeb && Supabase.instance.client.auth.currentUser != null) {
+  if (firebaseReady && AuthSession.current != null) {
     await NotificationService.init();
   }
 

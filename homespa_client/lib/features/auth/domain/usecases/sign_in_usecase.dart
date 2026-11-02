@@ -9,7 +9,7 @@ class SignInUseCase {
   const SignInUseCase(this._repository);
 
   Future<Either<Failure, AppUser>> call({
-    required String email,
+    required String phone,
     required String password,
-  }) => _repository.signInWithEmail(email: email, password: password);
+  }) => _repository.signIn(phone: phone, password: password);
 }

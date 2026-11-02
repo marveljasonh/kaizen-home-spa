@@ -8,6 +8,8 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../domain/entities/booking_request.dart';
 import '../providers/booking_cart.dart';
 import '../providers/booking_providers.dart';
+import '../providers/branch_providers.dart';
+import '../providers/order_history_providers.dart';
 import '../widgets/booking_step_indicator.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
@@ -17,9 +19,34 @@ class PaymentPage extends ConsumerStatefulWidget {
   ConsumerState<PaymentPage> createState() => _PaymentPageState();
 }
 
+// The three ways a booking can be paid (client decision, 2026-10-13). Ids
+// match the platform's payment_method enum. The payment-gateway charge for
+// transfer_before_delivery arrives with the gateway integration.
+const List<(String, String, String, IconData)> _kPaymentMethods = [
+  (
+    'cash',
+    'Cash on Delivery',
+    'Pay in cash when the therapist arrives',
+    Icons.payments_rounded,
+  ),
+  (
+    'transfer_on_delivery',
+    'Transfer on Delivery',
+    'Bank transfer when the therapist arrives',
+    Icons.account_balance_rounded,
+  ),
+  (
+    'transfer_before_delivery',
+    'Transfer Before Delivery',
+    'Bank transfer before your session is confirmed',
+    Icons.schedule_send_rounded,
+  ),
+];
+
 class _PaymentPageState extends ConsumerState<PaymentPage> {
   bool _isLoading = false;
   String? _successBookingId;
+  String _method = 'cash';
 
   Future<void> _confirmOrder(BookingCart cart) async {
     if ((!cart.isTotallyFree && cart.items.isEmpty) ||
@@ -42,12 +69,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       treatmentDurationId: cart.selectedDuration?.id,
       therapistId: cart.therapist?.id,
       scheduledAt: scheduledAt,
+      branchId: ref.read(selectedBranchIdProvider),
+      addressId: cart.address!.id,
       addressText: cart.address!.fullAddress,
       latitude: cart.address!.latitude,
       longitude: cart.address!.longitude,
       addressNotes: cart.address!.notes,
       voucherCode: cart.voucher?.code,
-      paymentMethodId: cart.isTotallyFree ? 'reward' : 'cash',
+      paymentMethodId: cart.isTotallyFree ? 'reward' : _method,
       subtotal: cart.subtotal,
       discountAmount: cart.discountAmount,
       total: cart.total,
@@ -94,6 +123,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       },
       (bookingId) {
         ref.read(bookingCartProvider.notifier).clearCart();
+        // The new booking must show in Home "Recent Orders" and the History
+        // tab without a manual pull-to-refresh.
+        ref.invalidate(orderHistoryProvider);
         setState(() => _successBookingId = bookingId);
       },
     );
@@ -125,13 +157,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             const SizedBox(height: 28),
           ] else ...[
             const FlowSectionLabel('Payment Method'),
-            const _MethodCard(
-              icon: Icons.payments_rounded,
-              title: 'Cash on Delivery',
-              subtitle: 'Pay in cash when the therapist arrives',
-              selected: true,
-            ),
-            const SizedBox(height: 28),
+            for (final (id, title, subtitle, icon) in _kPaymentMethods) ...[
+              GestureDetector(
+                onTap: () => setState(() => _method = id),
+                child: _MethodCard(
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                  selected: _method == id,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 16),
           ],
 
           // ── Order summary ─────────────────────────────────────────────────

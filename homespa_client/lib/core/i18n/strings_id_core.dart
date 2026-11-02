@@ -20,6 +20,23 @@ const Map<String, String> kStringsIdCore = {
   'Couldn\'t open WhatsApp': 'WhatsApp tidak dapat dibuka',
   'Couldn\'t start the call': 'Panggilan tidak dapat dimulai',
 
+  // Branch selection
+  'Choose Your Branch': 'Pilih Cabang',
+  'Branch': 'Cabang',
+  'Change': 'Ubah',
+  'Choose': 'Pilih',
+  'Nearest branch': 'Cabang terdekat',
+  'Nearest branch (auto)': 'Cabang terdekat (otomatis)',
+  'We pick the branch closest to your address':
+      'Kami memilih cabang terdekat dari alamat Anda',
+  'Availability and your therapist come from this branch.':
+      'Ketersediaan jadwal dan terapis Anda berasal dari cabang ini.',
+  'Couldn’t load branches. Check your connection and try again.':
+      'Daftar cabang tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.',
+  'Search branch or area…': 'Cari cabang atau area…',
+  'No branch matches your search.': 'Tidak ada cabang yang cocok.',
+  'Serves:': 'Melayani:',
+
   // Shared
   'Back': 'Kembali',
   'Cancel': 'Batal',

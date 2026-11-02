@@ -39,9 +39,19 @@ class BookingItemRequest {
 
 class BookingRequest {
   final String treatmentId;
+
+  /// Platform package id (a treatment's duration variant IS a package).
   final String? treatmentDurationId;
   final String? therapistId;
   final DateTime scheduledAt;
+
+  /// Explicitly chosen branch ("Choose Your Branch"); when null the platform
+  /// uses the branch nearest to the booking address.
+  final String? branchId;
+
+  /// Saved platform address id; when null the address is created from
+  /// [addressText] + coordinates at booking time.
+  final String? addressId;
   final String addressText;
   final double latitude;
   final double longitude;
@@ -63,6 +73,8 @@ class BookingRequest {
     this.treatmentDurationId,
     this.therapistId,
     required this.scheduledAt,
+    this.branchId,
+    this.addressId,
     required this.addressText,
     required this.latitude,
     required this.longitude,

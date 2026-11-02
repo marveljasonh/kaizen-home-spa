@@ -18,13 +18,13 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -34,7 +34,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     await ref
         .read(authNotifierProvider.notifier)
         .signIn(
-          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
           password: _passwordController.text,
         );
   }
@@ -72,16 +72,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AuthTextField(
-                      controller: _emailController,
-                      label: 'Email',
-                      hint: 'you@example.com',
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _phoneController,
+                      label: 'Phone Number',
+                      hint: '0812 3456 7890',
+                      keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return tr('Email is required');
+                          return tr('Phone number is required');
                         }
-                        if (!v.contains('@')) return tr('Enter a valid email');
+                        if (v.trim().replaceAll(RegExp(r'\D'), '').length < 8) {
+                          return tr('Enter a valid phone number');
+                        }
                         return null;
                       },
                     ),
@@ -167,18 +169,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.spa_outlined,
-            size: 40,
-            color: AppColors.primary,
-          ),
+        // The white lotus brand mark (same asset as the welcome screen).
+        Image.asset(
+          'assets/images/splash/logo_mark.png',
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
         ),
         const SizedBox(height: 20),
         Text(
