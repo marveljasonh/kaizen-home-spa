@@ -28,8 +28,9 @@ const double _kCardMinHeight = 112;
 /// here are appended after these, without a subtitle.
 const Map<String, String> _kCategorySubtitles = {
   'Massage': 'Treatment Pemijatan',
-  'Hair Care': 'Treatment Rambut',
-  'Nail Care': 'Treatment Kuku',
+  'Combo Massage': 'Paket Pijat Kombinasi',
+  'Mom & Baby': 'Perawatan Ibu & Bayi',
+  'Scrub, Nails & Hair': 'Perawatan Lulur, Kuku & Rambut',
 };
 
 /// Figma: Florian Regular, underlined. [scale] shrinks it with the card.
